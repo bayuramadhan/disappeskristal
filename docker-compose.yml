@@ -1,0 +1,46 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: distribusipro_db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: distribusi_user
+      POSTGRES_PASSWORD: distribusi_pass
+      POSTGRES_DB: distribusi_pro
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U distribusi_user -d distribusi_pro"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: distribusipro_app
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      DATABASE_URL: postgresql://distribusi_user:distribusi_pass@postgres:5432/distribusi_pro?schema=public
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-distribusipro-secret-dev-2024}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      sh -c "
+        npx prisma migrate deploy &&
+        (./node_modules/.bin/ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts || echo 'Seed skipped (data mungkin sudah ada)') &&
+        node .next/standalone/server.js
+      "
+
+volumes:
+  postgres_data:

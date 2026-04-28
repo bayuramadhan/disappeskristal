@@ -1,0 +1,434 @@
+// DistribusiPro - Prisma Schema
+// Sistem Distribusi FMCG Es Kristal
+
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["views"]
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ==================== AUTH ====================
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          UserRole  @default(OPERATOR)
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts Account[]
+  sessions Session[]
+}
+
+enum UserRole {
+  ADMIN
+  SUPERVISOR
+  OPERATOR
+  DRIVER
+  SALES
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+// ==================== PHASE 1: CORE TABLES ====================
+
+model Rayon {
+  id               String    @id @default(cuid())
+  name             String
+  coverageArea     String?
+  defaultVehicleId String?
+  activeStatus     Boolean   @default(true)
+  deletedAt        DateTime?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+
+  customers        Customer[]
+  orders           Order[]
+  fleetDailyStatus FleetDailyStatus[]
+  priceProfiles    PriceProfile[]
+}
+
+model Vehicle {
+  id                    String        @id @default(cuid())
+  plateNumber           String        @unique
+  capacitySak           Float         @default(0)
+  operationalCostPerDay Float         @default(0)
+  status                VehicleStatus @default(ACTIVE)
+  deletedAt             DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
+
+  drivers             Driver[]
+  orders              Order[]
+  fleetDailyStatus    FleetDailyStatus[]
+  deliveryLogs        DeliveryLog[]
+  vehicleLoads        VehicleLoad[]
+  vehicleCosts        VehicleCost[]
+  vehicleMaintenances VehicleMaintenance[]
+}
+
+enum VehicleStatus {
+  ACTIVE
+  INACTIVE
+  MAINTENANCE
+}
+
+model Driver {
+  id                String       @id @default(cuid())
+  name              String
+  phone             String?
+  assignedVehicleId String?
+  status            DriverStatus @default(ACTIVE)
+  deletedAt         DateTime?
+  createdAt         DateTime     @default(now())
+  updatedAt         DateTime     @updatedAt
+
+  assignedVehicle    Vehicle?            @relation(fields: [assignedVehicleId], references: [id])
+  fleetDailyStatus   FleetDailyStatus[]
+  deliveryLogs       DeliveryLog[]
+  driverAttendances  DriverAttendance[]
+  driverPerformances DriverPerformance[]
+}
+
+enum DriverStatus {
+  ACTIVE
+  INACTIVE
+  ON_LEAVE
+}
+
+model Customer {
+  id           String       @id @default(cuid())
+  name         String
+  phone        String?
+  address      String?
+  rayonId      String?
+  customerType CustomerType @default(WARUNG)
+  defaultPrice Float        @default(0)
+  notes        String?
+  gpsLat       Float?
+  gpsLng       Float?
+  activeStatus Boolean      @default(true)
+  deletedAt    DateTime?
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  rayon  Rayon?  @relation(fields: [rayonId], references: [id])
+  orders Order[]
+
+  @@index([rayonId])
+  @@index([activeStatus])
+  @@index([customerType])
+}
+
+enum CustomerType {
+  WARUNG
+  DEPOT
+  TOKO
+}
+
+model FleetDailyStatus {
+  id            String    @id @default(cuid())
+  date          DateTime  @db.Date
+  vehicleId     String
+  driverId      String
+  rayonId       String
+  helperName    String?
+  activeStatus  Boolean   @default(true)
+  departureTime DateTime?
+  initialLoad   Float     @default(0)
+  remainingLoad Float     @default(0)
+  deletedAt     DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+  driver  Driver  @relation(fields: [driverId], references: [id])
+  rayon   Rayon   @relation(fields: [rayonId], references: [id])
+
+  @@index([date])
+  @@index([vehicleId, date])
+  @@index([driverId, date])
+  @@index([rayonId, date])
+}
+
+model Order {
+  id            String       @id @default(cuid())
+  customerId    String
+  vehicleId     String?
+  rayonId       String?
+  orderChannel  OrderChannel @default(PREORDER)
+  orderType     String?
+  orderedQty    Float        @default(0)
+  deliveredQty  Float        @default(0)
+  returnedQty   Float        @default(0)
+  additionalQty Float        @default(0)
+  pricePerUnit  Float        @default(0)
+  status        OrderStatus  @default(CREATED)
+  notes         String?
+  deliveryDate  DateTime     @db.Date
+  deletedAt     DateTime?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime     @updatedAt
+
+  customer     Customer      @relation(fields: [customerId], references: [id])
+  vehicle      Vehicle?      @relation(fields: [vehicleId], references: [id])
+  rayon        Rayon?        @relation(fields: [rayonId], references: [id])
+  deliveryLogs DeliveryLog[]
+
+  @@index([deliveryDate, status])
+  @@index([customerId])
+  @@index([vehicleId, deliveryDate])
+  @@index([rayonId, deliveryDate])
+  @@index([status])
+  @@index([orderChannel])
+}
+
+enum OrderChannel {
+  PREORDER
+  HOTLINE
+  CANVAS
+  ADMIN_INPUT
+}
+
+enum OrderStatus {
+  CREATED
+  CONFIRMED
+  ASSIGNED
+  LOADED
+  DELIVERED
+  PARTIAL
+  REJECTED
+  RETURNED
+  CANCELLED
+}
+
+model DeliveryLog {
+  id           String        @id @default(cuid())
+  orderId      String
+  vehicleId    String
+  driverId     String
+  deliveredQty Float         @default(0)
+  returnedQty  Float         @default(0)
+  returnReason ReturnReason?
+  timestamp    DateTime      @default(now())
+
+  order   Order   @relation(fields: [orderId], references: [id])
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+  driver  Driver  @relation(fields: [driverId], references: [id])
+
+  @@index([orderId])
+  @@index([vehicleId, timestamp])
+  @@index([driverId, timestamp])
+}
+
+enum ReturnReason {
+  WEATHER
+  CUSTOMER_CLOSED
+  ALREADY_BOUGHT
+  LATE_DELIVERY
+  REDUCED_NEED
+  OTHER
+}
+
+// ==================== PHASE 2: PRODUKSI & GUDANG ====================
+
+model ProductionPlan {
+  id                       String   @id @default(cuid())
+  productionDate           DateTime @db.Date
+  confirmedPreorderQty     Float    @default(0)
+  estimatedCanvasQty       Float    @default(0)
+  riskAdjustmentQty        Float    @default(0)
+  recommendedProductionQty Float    @default(0)
+  actualProductionQty      Float    @default(0)
+  createdAt                DateTime @default(now())
+  updatedAt                DateTime @updatedAt
+
+  @@unique([productionDate])
+  @@index([productionDate])
+}
+
+model WarehouseStock {
+  id           String   @id @default(cuid())
+  date         DateTime @db.Date
+  openingStock Float    @default(0)
+  productionIn Float    @default(0)
+  loadingOut   Float    @default(0)
+  returnedIn   Float    @default(0)
+  closingStock Float    @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@unique([date])
+  @@index([date])
+}
+
+model VehicleLoad {
+  id           String   @id @default(cuid())
+  vehicleId    String
+  date         DateTime @db.Date
+  loadedQty    Float    @default(0)
+  soldQty      Float    @default(0)
+  returnedQty  Float    @default(0)
+  remainingQty Float    @default(0)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+
+  @@unique([vehicleId, date])
+  @@index([vehicleId, date])
+}
+
+// ==================== PHASE 3: KEUANGAN ====================
+
+model PriceProfile {
+  id           String       @id @default(cuid())
+  customerType CustomerType
+  channel      OrderChannel
+  rayonId      String?
+  price        Float
+  validFrom    DateTime     @db.Date
+  validUntil   DateTime     @db.Date
+  createdAt    DateTime     @default(now())
+  updatedAt    DateTime     @updatedAt
+
+  rayon Rayon? @relation(fields: [rayonId], references: [id])
+
+  @@unique([customerType, channel, rayonId, validFrom])
+  @@index([customerType, channel])
+  @@index([validFrom, validUntil])
+}
+
+model VehicleCost {
+  id               String   @id @default(cuid())
+  vehicleId        String
+  fuelCost         Float    @default(0)
+  driverCost       Float    @default(0)
+  helperCost       Float    @default(0)
+  maintenanceCost  Float    @default(0)
+  depreciationCost Float    @default(0)
+  date             DateTime @db.Date
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+
+  @@unique([vehicleId, date])
+  @@index([vehicleId, date])
+}
+
+// RevenueSummary = VIEW (bukan tabel)
+// SQL ada di prisma/views.sql — jalankan setelah migrate
+// Query via prisma.$queryRaw atau lib/revenue.ts
+view RevenueSummary {
+  id                String  @unique
+  date              DateTime @db.Date
+  rayonId           String?
+  rayonName         String?
+  totalOrders       Int
+  totalDeliveredQty Float
+  totalReturnedQty  Float
+  grossRevenue      Float
+  totalVehicleCost  Float
+  netRevenue        Float
+
+  @@map("revenue_summary")
+}
+
+// ==================== PHASE 4: SDM ====================
+
+model DriverAttendance {
+  id        String           @id @default(cuid())
+  driverId  String
+  date      DateTime         @db.Date
+  status    AttendanceStatus
+  createdAt DateTime         @default(now())
+  updatedAt DateTime         @updatedAt
+
+  driver Driver @relation(fields: [driverId], references: [id])
+
+  @@unique([driverId, date])
+  @@index([driverId])
+  @@index([date])
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  SICK
+  LEAVE
+}
+
+model DriverPerformance {
+  id              String   @id @default(cuid())
+  driverId        String
+  date            DateTime @db.Date
+  totalDelivered  Float    @default(0)
+  totalReturned   Float    @default(0)
+  efficiencyScore Float    @default(0)
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+
+  driver Driver @relation(fields: [driverId], references: [id])
+
+  @@unique([driverId, date])
+  @@index([driverId, date])
+}
+
+model VehicleMaintenance {
+  id          String   @id @default(cuid())
+  vehicleId   String
+  serviceDate DateTime @db.Date
+  serviceType String
+  cost        Float    @default(0)
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+
+  @@index([vehicleId, serviceDate])
+}

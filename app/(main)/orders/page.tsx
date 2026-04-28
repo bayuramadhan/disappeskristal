@@ -1,0 +1,356 @@
+'use client'
+
+import { useState } from 'react'
+import { format } from 'date-fns'
+import { Plus, Search, X, Download } from 'lucide-react'
+import Papa from 'papaparse'
+import { useOrders } from '@/hooks/useOrders'
+import { useCustomers } from '@/hooks/useCustomers'
+import { useRole } from '@/hooks/useRole'
+import { toast } from '@/hooks/use-toast'
+import { PageHeader } from '@/components/shared/PageHeader'
+import { StatusBadge } from '@/components/shared/StatusBadge'
+import { ChannelTag } from '@/components/shared/ChannelTag'
+import { LoadingState } from '@/components/shared/LoadingState'
+import { EmptyState } from '@/components/shared/EmptyState'
+import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
+import { Card, CardContent } from '@/components/ui/card'
+import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Textarea } from '@/components/ui/textarea'
+import { formatCurrency } from '@/lib/utils'
+import useSWR, { mutate } from 'swr'
+import { fetcher } from '@/lib/fetcher'
+
+const STATUS_OPTIONS  = ['CREATED', 'CONFIRMED', 'LOADED', 'DELIVERED', 'PARTIAL', 'RETURNED', 'CANCELLED']
+const CHANNEL_OPTIONS = ['PREORDER', 'HOTLINE', 'CANVAS', 'ADMIN_INPUT']
+
+export default function OrdersPage() {
+  const today = format(new Date(), 'yyyy-MM-dd')
+  const [filters, setFilters]         = useState({ date: today, status: '', channel: '', search: '', page: 1 })
+  const [selectedOrder, setSelectedOrder] = useState<any>(null)
+  const [newOrderOpen, setNewOrderOpen]   = useState(false)
+  const [newOrderForm, setNewOrderForm]   = useState({
+    customerId: '', orderChannel: 'PREORDER', deliveryDate: today,
+    orderedQty: '', pricePerUnit: '', notes: '',
+  })
+  const [submitting, setSubmitting] = useState(false)
+
+  const { canWrite } = useRole()
+  const { data, isLoading } = useOrders({ ...filters, limit: 20 })
+  const { data: customers }  = useCustomers({ limit: 200 } as any)
+  const selectedOrderDetail  = useSWR(selectedOrder ? `/api/orders/${selectedOrder.id}` : null, fetcher)
+
+  const setFilter = (key: string, value: string) =>
+    setFilters(f => ({ ...f, [key]: value, page: 1 }))
+
+  // ── Submit new order ──────────────────────────────────────────────────────
+  async function submitNewOrder(e: React.FormEvent) {
+    e.preventDefault()
+    setSubmitting(true)
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          ...newOrderForm,
+          orderedQty:   Number(newOrderForm.orderedQty),
+          pricePerUnit: Number(newOrderForm.pricePerUnit),
+        }),
+      })
+      if (res.ok) {
+        setNewOrderOpen(false)
+        mutate('/api/orders')
+        setNewOrderForm({ customerId: '', orderChannel: 'PREORDER', deliveryDate: today, orderedQty: '', pricePerUnit: '', notes: '' })
+        toast({ title: 'Pesanan berhasil dibuat', variant: 'success' })
+      } else {
+        const err = await res.json().catch(() => ({}))
+        toast({ title: 'Gagal membuat pesanan', description: err.message, variant: 'destructive' })
+      }
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  // ── CSV Export ────────────────────────────────────────────────────────────
+  function exportCSV() {
+    const orders = data?.orders ?? data ?? []
+    if (!orders.length) {
+      toast({ title: 'Tidak ada data untuk diekspor', variant: 'warning' as any })
+      return
+    }
+    const rows = orders.map((o: any) => ({
+      'No. Pesanan':    o.orderNumber,
+      'Pelanggan':      o.customer?.name ?? '-',
+      'Tipe Pelanggan': o.customer?.customerType ?? '-',
+      'Rayon':          o.rayon?.name ?? '-',
+      'Channel':        o.orderChannel,
+      'Tanggal Kirim':  o.deliveryDate ? format(new Date(o.deliveryDate), 'dd/MM/yyyy') : '-',
+      'Qty Dipesan':    o.orderedQty,
+      'Qty Terkirim':   o.deliveredQty ?? 0,
+      'Qty Retur':      o.returnedQty ?? 0,
+      'Harga/sak':      o.pricePerUnit,
+      'Nilai Total':    (o.deliveredQty ?? 0) * o.pricePerUnit,
+      'Status':         o.status,
+    }))
+    const csv  = Papa.unparse(rows)
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' })
+    const url  = URL.createObjectURL(blob)
+    const a    = Object.assign(document.createElement('a'), {
+      href: url,
+      download: `pesanan-${filters.date}.csv`,
+    })
+    a.click()
+    URL.revokeObjectURL(url)
+    toast({ title: `${rows.length} pesanan diekspor ke CSV`, variant: 'success' })
+  }
+
+  const orders = data?.orders ?? data ?? []
+  const meta   = data?.meta
+
+  return (
+    <div>
+      <PageHeader
+        title="Pesanan"
+        description="Kelola semua pesanan pengiriman es kristal"
+        action={
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" className="gap-1.5" onClick={exportCSV}>
+              <Download className="h-4 w-4" /> Export CSV
+            </Button>
+            {canWrite && (
+              <Dialog open={newOrderOpen} onOpenChange={setNewOrderOpen}>
+                <DialogTrigger asChild>
+                  <Button size="sm" className="gap-1.5">
+                    <Plus className="h-4 w-4" /> Pesanan Baru
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Buat Pesanan Baru</DialogTitle>
+                  </DialogHeader>
+                  <form onSubmit={submitNewOrder} className="space-y-4">
+                    <div className="space-y-1.5">
+                      <Label>Pelanggan</Label>
+                      <Select value={newOrderForm.customerId} onValueChange={v => setNewOrderForm(f => ({ ...f, customerId: v }))}>
+                        <SelectTrigger><SelectValue placeholder="Pilih pelanggan..." /></SelectTrigger>
+                        <SelectContent>
+                          {(customers ?? []).map((c: any) => (
+                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label>Channel</Label>
+                        <Select value={newOrderForm.orderChannel} onValueChange={v => setNewOrderForm(f => ({ ...f, orderChannel: v }))}>
+                          <SelectTrigger><SelectValue /></SelectTrigger>
+                          <SelectContent>
+                            {CHANNEL_OPTIONS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Tanggal Kirim</Label>
+                        <Input type="date" value={newOrderForm.deliveryDate} onChange={e => setNewOrderForm(f => ({ ...f, deliveryDate: e.target.value }))} />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                      <div className="space-y-1.5">
+                        <Label>Qty (sak)</Label>
+                        <Input type="number" min={1} value={newOrderForm.orderedQty} onChange={e => setNewOrderForm(f => ({ ...f, orderedQty: e.target.value }))} required />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Harga/sak (Rp)</Label>
+                        <Input type="number" min={0} value={newOrderForm.pricePerUnit} onChange={e => setNewOrderForm(f => ({ ...f, pricePerUnit: e.target.value }))} required />
+                      </div>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Catatan</Label>
+                      <Textarea value={newOrderForm.notes} onChange={e => setNewOrderForm(f => ({ ...f, notes: e.target.value }))} placeholder="Opsional..." rows={2} />
+                    </div>
+                    <DialogFooter>
+                      <Button type="button" variant="outline" onClick={() => setNewOrderOpen(false)}>Batal</Button>
+                      <Button type="submit" disabled={submitting}>{submitting ? 'Menyimpan...' : 'Simpan'}</Button>
+                    </DialogFooter>
+                  </form>
+                </DialogContent>
+              </Dialog>
+            )}
+          </div>
+        }
+      />
+
+      {/* Filters */}
+      <Card className="mb-4">
+        <CardContent className="pt-4 pb-4">
+          <div className="flex flex-wrap gap-3 items-end">
+            <div className="space-y-1">
+              <Label className="text-xs">Tanggal</Label>
+              <Input type="date" value={filters.date} onChange={e => setFilter('date', e.target.value)} className="w-36 h-8 text-sm" />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Status</Label>
+              <Select value={filters.status || 'all'} onValueChange={v => setFilter('status', v === 'all' ? '' : v)}>
+                <SelectTrigger className="w-36 h-8 text-sm"><SelectValue placeholder="Semua" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua</SelectItem>
+                  {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Channel</Label>
+              <Select value={filters.channel || 'all'} onValueChange={v => setFilter('channel', v === 'all' ? '' : v)}>
+                <SelectTrigger className="w-36 h-8 text-sm"><SelectValue placeholder="Semua" /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="all">Semua</SelectItem>
+                  {CHANNEL_OPTIONS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-1 flex-1 min-w-[160px]">
+              <Label className="text-xs">Cari</Label>
+              <div className="relative">
+                <Search className="absolute left-2.5 top-2 h-3.5 w-3.5 text-muted-foreground" />
+                <Input
+                  value={filters.search}
+                  onChange={e => setFilter('search', e.target.value)}
+                  placeholder="Nama pelanggan..."
+                  className="h-8 text-sm pl-8"
+                />
+              </div>
+            </div>
+            {(filters.status || filters.channel || filters.search) && (
+              <Button variant="ghost" size="sm" className="h-8 gap-1 text-xs"
+                onClick={() => setFilters(f => ({ ...f, status: '', channel: '', search: '' }))}>
+                <X className="h-3 w-3" /> Reset
+              </Button>
+            )}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Table */}
+      <Card>
+        <CardContent className="p-0">
+          {isLoading ? (
+            <div className="p-6"><LoadingState rows={6} /></div>
+          ) : orders.length === 0 ? (
+            <EmptyState title="Tidak ada pesanan" description="Tidak ada pesanan yang sesuai filter." />
+          ) : (
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>No. Pesanan</TableHead>
+                  <TableHead>Pelanggan</TableHead>
+                  <TableHead>Channel</TableHead>
+                  <TableHead>Tanggal Kirim</TableHead>
+                  <TableHead className="text-right">Qty (sak)</TableHead>
+                  <TableHead className="text-right">Nilai</TableHead>
+                  <TableHead>Status</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {orders.map((order: any) => (
+                  <TableRow key={order.id} className="cursor-pointer" onClick={() => setSelectedOrder(order)}>
+                    <TableCell className="font-mono text-xs">{order.orderNumber}</TableCell>
+                    <TableCell className="font-medium text-sm">{order.customer?.name ?? '-'}</TableCell>
+                    <TableCell><ChannelTag channel={order.orderChannel} /></TableCell>
+                    <TableCell className="text-sm">{order.deliveryDate ? format(new Date(order.deliveryDate), 'dd/MM/yyyy') : '-'}</TableCell>
+                    <TableCell className="text-right text-sm">{order.orderedQty}</TableCell>
+                    <TableCell className="text-right text-sm">{formatCurrency(order.orderedQty * order.pricePerUnit)}</TableCell>
+                    <TableCell><StatusBadge status={order.status} /></TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Pagination */}
+      {meta && meta.totalPages > 1 && (
+        <div className="flex items-center justify-between mt-4 text-sm text-muted-foreground">
+          <span>Halaman {meta.page} dari {meta.totalPages} ({meta.total} pesanan)</span>
+          <div className="flex gap-2">
+            <Button variant="outline" size="sm" disabled={filters.page <= 1}
+              onClick={() => setFilters(f => ({ ...f, page: f.page - 1 }))}>Sebelumnya</Button>
+            <Button variant="outline" size="sm" disabled={filters.page >= meta.totalPages}
+              onClick={() => setFilters(f => ({ ...f, page: f.page + 1 }))}>Berikutnya</Button>
+          </div>
+        </div>
+      )}
+
+      {/* Detail Sheet */}
+      <Sheet open={!!selectedOrder} onOpenChange={open => !open && setSelectedOrder(null)}>
+        <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
+          <SheetHeader>
+            <SheetTitle>Detail Pesanan</SheetTitle>
+          </SheetHeader>
+          {selectedOrderDetail.isLoading ? (
+            <div className="mt-6"><LoadingState rows={4} /></div>
+          ) : selectedOrderDetail.data ? (
+            <div className="mt-6 space-y-4">
+              {(() => {
+                const o = selectedOrderDetail.data
+                return (
+                  <>
+                    <div className="flex justify-between items-start">
+                      <div>
+                        <p className="font-mono text-xs text-muted-foreground">{o.orderNumber}</p>
+                        <p className="font-semibold text-lg mt-0.5">{o.customer?.name}</p>
+                        <p className="text-sm text-muted-foreground">{o.customer?.customerType} — {o.rayon?.name ?? 'No Rayon'}</p>
+                      </div>
+                      <StatusBadge status={o.status} />
+                    </div>
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div><p className="text-muted-foreground text-xs">Channel</p><ChannelTag channel={o.orderChannel} /></div>
+                      <div><p className="text-muted-foreground text-xs">Tanggal Kirim</p><p className="font-medium">{o.deliveryDate ? format(new Date(o.deliveryDate), 'dd/MM/yyyy') : '-'}</p></div>
+                      <div><p className="text-muted-foreground text-xs">Qty Dipesan</p><p className="font-semibold">{o.orderedQty} sak</p></div>
+                      <div><p className="text-muted-foreground text-xs">Harga/sak</p><p className="font-medium">{formatCurrency(o.pricePerUnit)}</p></div>
+                      <div><p className="text-muted-foreground text-xs">Terkirim</p><p className="font-semibold text-emerald-600">{o.deliveredQty ?? 0} sak</p></div>
+                      <div><p className="text-muted-foreground text-xs">Dikembalikan</p><p className="font-semibold text-destructive">{o.returnedQty ?? 0} sak</p></div>
+                    </div>
+                    <div className="rounded-lg bg-muted p-3">
+                      <p className="text-xs text-muted-foreground mb-1">Total Nilai</p>
+                      <p className="text-xl font-bold">{formatCurrency((o.deliveredQty ?? 0) * o.pricePerUnit)}</p>
+                    </div>
+                    {o.notes && (
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Catatan</p>
+                        <p className="text-sm">{o.notes}</p>
+                      </div>
+                    )}
+                    {o.deliveryLogs?.length > 0 && (
+                      <div>
+                        <p className="text-sm font-medium mb-2">Log Pengiriman</p>
+                        <div className="space-y-2">
+                          {o.deliveryLogs.map((log: any) => (
+                            <div key={log.id} className="rounded border p-3 text-xs">
+                              <div className="flex justify-between">
+                                <span>{log.driver?.name ?? '-'}</span>
+                                <span className="text-muted-foreground">{log.timestamp ? format(new Date(log.timestamp), 'dd/MM HH:mm') : '-'}</span>
+                              </div>
+                              <p className="mt-1">Terkirim: <span className="font-medium">{log.deliveredQty} sak</span> | Retur: <span className="font-medium">{log.returnedQty} sak</span></p>
+                              {log.returnReason && <p className="text-muted-foreground mt-0.5">Alasan: {log.returnReason}</p>}
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
+            </div>
+          ) : null}
+        </SheetContent>
+      </Sheet>
+    </div>
+  )
+}
