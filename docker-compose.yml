@@ -39,7 +39,7 @@ services:
       sh -c "
         npx prisma migrate deploy &&
         (./node_modules/.bin/ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts || echo 'Seed skipped (data mungkin sudah ada)') &&
-        node .next/standalone/server.js
+        npm start
       "
 
 volumes:

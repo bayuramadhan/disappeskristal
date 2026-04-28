@@ -3,21 +3,17 @@ WORKDIR /app
 
 RUN apk add --no-cache openssl
 
-# Install ALL deps (termasuk dev) agar prisma CLI + ts-node tersedia saat startup
 COPY package*.json ./
 RUN npm ci --ignore-scripts
 
 COPY . .
 
+# Generate Prisma client + build Next.js (tanpa migrate — dijalankan saat startup)
 RUN npx prisma generate
-RUN npm run build
-
-# Copy static assets ke standalone output agar ter-serve dengan benar
-RUN cp -r .next/static .next/standalone/.next/static
+RUN npx next build
 
 EXPOSE 3000
-ENV PORT=3000
-ENV HOSTNAME=0.0.0.0
 ENV NODE_ENV=production
+ENV PORT=3000
 
-CMD ["node", ".next/standalone/server.js"]
+CMD ["npm", "start"]
