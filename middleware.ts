@@ -55,8 +55,25 @@ export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
   const start = Date.now()
 
-  if (!pathname.startsWith('/api/')) return NextResponse.next()
+  // ── Page auth guard ────────────────────────────────────────────────────────
+  if (!pathname.startsWith('/api/')) {
+    const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
 
+    if (pathname === '/login') {
+      if (token) return NextResponse.redirect(new URL('/dashboard', req.url))
+      return NextResponse.next()
+    }
+
+    if (!token) {
+      const loginUrl = new URL('/login', req.url)
+      loginUrl.searchParams.set('callbackUrl', pathname)
+      return NextResponse.redirect(loginUrl)
+    }
+
+    return NextResponse.next()
+  }
+
+  // ── API routes ─────────────────────────────────────────────────────────────
   const ip = req.headers.get('x-forwarded-for')?.split(',')[0].trim()
     ?? req.headers.get('x-real-ip')
     ?? 'unknown'
@@ -100,5 +117,10 @@ function withHeaders(res: NextResponse, remaining: number, start: number, req: N
   return res
 }
 
-export const config = { matcher: ['/api/:path*'] }
+export const config = {
+  matcher: [
+    '/api/:path*',
+    '/((?!_next/static|_next/image|favicon.ico).*)',
+  ],
+}
 
