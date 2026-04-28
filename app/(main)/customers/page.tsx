@@ -16,6 +16,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { mutate } from 'swr'
+import { useRole } from '@/hooks/useRole'
 
 const TYPE_OPTIONS = ['WARUNG', 'DEPOT', 'TOKO']
 
@@ -25,6 +26,7 @@ export default function CustomersPage() {
   const [form, setForm] = useState({ name: '', phone: '', address: '', customerType: 'WARUNG', rayonId: '' })
   const [submitting, setSubmitting] = useState(false)
 
+  const { canManage } = useRole()
   const { data, isLoading } = useCustomers(filters)
   const { data: rayons } = useRayons()
 
@@ -58,9 +60,11 @@ export default function CustomersPage() {
         description="Daftar pelanggan aktif"
         action={
           <Dialog open={newOpen} onOpenChange={setNewOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="gap-1.5"><Plus className="h-4 w-4" /> Pelanggan Baru</Button>
-            </DialogTrigger>
+            {canManage && (
+              <DialogTrigger asChild>
+                <Button size="sm" className="gap-1.5"><Plus className="h-4 w-4" /> Pelanggan Baru</Button>
+              </DialogTrigger>
+            )}
             <DialogContent className="max-w-md">
               <DialogHeader><DialogTitle>Tambah Pelanggan</DialogTitle></DialogHeader>
               <form onSubmit={handleCreate} className="space-y-4">

@@ -5,6 +5,7 @@ import { format, subDays } from 'date-fns'
 import { TrendingUp, TrendingDown, DollarSign, Package, Download } from 'lucide-react'
 import * as XLSX from 'xlsx'
 import { useFinance } from '@/hooks/useFinance'
+import { useRole } from '@/hooks/useRole'
 import { toast } from '@/hooks/use-toast'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingState } from '@/components/shared/LoadingState'
@@ -23,6 +24,7 @@ export default function FinancePage() {
   const [endDate, setEndDate]     = useState(today)
   const [groupBy, setGroupBy]     = useState<'day' | 'vehicle' | 'rayon'>('day')
 
+  const { canViewFinance } = useRole()
   const { data, isLoading } = useFinance({ startDate, endDate, groupBy })
 
   const totals = data?.totals
@@ -97,9 +99,11 @@ export default function FinancePage() {
             </SelectContent>
           </Select>
         </div>
-        <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={exportExcel}>
-          <Download className="h-3.5 w-3.5" /> Export Excel
-        </Button>
+        {canViewFinance && (
+          <Button variant="outline" size="sm" className="h-8 gap-1.5" onClick={exportExcel}>
+            <Download className="h-3.5 w-3.5" /> Export Excel
+          </Button>
+        )}
       </div>
 
       {/* Summary cards */}

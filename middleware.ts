@@ -38,7 +38,9 @@ function checkRoleAccess(pathname: string, method: string, role: string): boolea
       return true
     }
     if (method === 'POST') {
-      return pathname.startsWith('/api/orders') || pathname.startsWith('/api/delivery-logs')
+      return pathname.startsWith('/api/orders') ||
+             pathname.startsWith('/api/delivery-logs') ||
+             pathname.startsWith('/api/fleet')
     }
     return false
   }

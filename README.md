@@ -104,7 +104,7 @@ App tersedia di [http://localhost:3000](http://localhost:3000)
 | **SUPERVISOR** | ✅ | 👁 read-only | 👁 read-only | 👁 read-only | ✅ | 👁 read-only |
 | **OPERATOR** | ✅ | ✅ buat order | 👁 read-only | 👁 read-only | ❌ | ❌ |
 
-RBAC diterapkan di level **middleware** (API routes) dan **UI** (tombol create/edit disembunyikan).
+RBAC diterapkan di level **middleware** (API routes) dan **UI** (tombol create/edit disembunyikan per role).
 
 ---
 
@@ -124,6 +124,7 @@ Daftar pesanan dengan filter tanggal/status/channel/pelanggan, drawer detail + l
 ### Armada (`/fleet`)
 Status kendaraan harian dengan progress bar muatan tersisa.
 - Aktivasi armada + assign driver — ADMIN & OPERATOR
+- Edit & hapus armada — ADMIN saja
 
 ### Pelanggan (`/customers`)
 Daftar pelanggan (WARUNG/DEPOT/TOKO) per rayon + halaman detail dengan statistik dan riwayat 20 pesanan terakhir.

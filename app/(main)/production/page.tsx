@@ -5,6 +5,7 @@ import { format, addDays } from 'date-fns'
 import { id } from 'date-fns/locale'
 import { AlertTriangle, CheckCircle2, Package, TrendingUp, Factory, Truck } from 'lucide-react'
 import { useProductionRecommendation } from '@/hooks/useProduction'
+import { useRole } from '@/hooks/useRole'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingCards } from '@/components/shared/LoadingState'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -21,6 +22,7 @@ export default function ProductionPage() {
   const [saving, setSaving] = useState(false)
   const [saveMsg, setSaveMsg] = useState('')
 
+  const { isAdmin } = useRole()
   const { data, isLoading, error } = useProductionRecommendation(date)
 
   const calc = data?.calculation
@@ -177,34 +179,36 @@ export default function ProductionPage() {
             </div>
           </div>
 
-          {/* Set actual quantity */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">{existing ? 'Update Rencana Produksi' : 'Tetapkan Rencana Produksi'}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="flex items-end gap-3">
-                <div className="space-y-1.5 flex-1 max-w-xs">
-                  <Label>Jumlah Produksi (sak)</Label>
-                  <Input
-                    type="number"
-                    min={0}
-                    value={actualQty}
-                    onChange={e => setActualQty(e.target.value)}
-                    placeholder={String(calc?.recommendedProductionQty ?? '')}
-                  />
+          {/* Set actual quantity — ADMIN only */}
+          {isAdmin && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">{existing ? 'Update Rencana Produksi' : 'Tetapkan Rencana Produksi'}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="flex items-end gap-3">
+                  <div className="space-y-1.5 flex-1 max-w-xs">
+                    <Label>Jumlah Produksi (sak)</Label>
+                    <Input
+                      type="number"
+                      min={0}
+                      value={actualQty}
+                      onChange={e => setActualQty(e.target.value)}
+                      placeholder={String(calc?.recommendedProductionQty ?? '')}
+                    />
+                  </div>
+                  <Button onClick={savePlan} disabled={saving || !actualQty}>
+                    {saving ? 'Menyimpan...' : existing ? 'Update' : 'Simpan'}
+                  </Button>
                 </div>
-                <Button onClick={savePlan} disabled={saving || !actualQty}>
-                  {saving ? 'Menyimpan...' : existing ? 'Update' : 'Simpan'}
-                </Button>
-              </div>
-              {saveMsg && (
-                <p className={`text-sm mt-2 ${saveMsg.includes('berhasil') ? 'text-emerald-600' : 'text-destructive'}`}>
-                  {saveMsg}
-                </p>
-              )}
-            </CardContent>
-          </Card>
+                {saveMsg && (
+                  <p className={`text-sm mt-2 ${saveMsg.includes('berhasil') ? 'text-emerald-600' : 'text-destructive'}`}>
+                    {saveMsg}
+                  </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
     </div>

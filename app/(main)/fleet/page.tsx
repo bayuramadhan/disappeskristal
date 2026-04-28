@@ -16,6 +16,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Progress } from '@/components/ui/progress'
 import { mutate } from 'swr'
+import { useRole } from '@/hooks/useRole'
 
 export default function FleetPage() {
   const today = format(new Date(), 'yyyy-MM-dd')
@@ -25,6 +26,7 @@ export default function FleetPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
+  const { canWrite } = useRole()
   const { data: fleet, isLoading } = useFleet(date)
   const { data: vehicles } = useVehicles()
   const { data: drivers } = useDrivers()
@@ -59,11 +61,13 @@ export default function FleetPage() {
         description="Status armada dan aktivasi kendaraan harian"
         action={
           <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-              <Button size="sm" className="gap-1.5">
-                <Plus className="h-4 w-4" /> Aktifkan Armada
-              </Button>
-            </DialogTrigger>
+            {canWrite && (
+              <DialogTrigger asChild>
+                <Button size="sm" className="gap-1.5">
+                  <Plus className="h-4 w-4" /> Aktifkan Armada
+                </Button>
+              </DialogTrigger>
+            )}
             <DialogContent className="max-w-sm">
               <DialogHeader><DialogTitle>Aktifkan Armada</DialogTitle></DialogHeader>
               <form onSubmit={handleActivate} className="space-y-4">
@@ -119,11 +123,11 @@ export default function FleetPage() {
         <EmptyState
           title="Tidak ada armada aktif"
           description={`Belum ada kendaraan yang diaktifkan untuk ${format(new Date(date + 'T00:00:00'), 'dd/MM/yyyy')}.`}
-          action={
+          action={canWrite ? (
             <Button size="sm" onClick={() => setOpen(true)} className="gap-1.5">
               <Plus className="h-4 w-4" /> Aktifkan Sekarang
             </Button>
-          }
+          ) : undefined}
         />
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
