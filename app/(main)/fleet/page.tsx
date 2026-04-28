@@ -100,7 +100,7 @@ export default function FleetPage() {
                   <Select value={form.rayonId} onValueChange={v => setForm(f => ({ ...f, rayonId: v }))}>
                     <SelectTrigger><SelectValue placeholder="Pilih rayon..." /></SelectTrigger>
                     <SelectContent>
-                      {(rayons?.data ?? []).map((r: any) => (
+                      {(rayons ?? []).map((r: any) => (
                         <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
                       ))}
                     </SelectContent>
