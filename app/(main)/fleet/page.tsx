@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { format } from 'date-fns'
 import { Plus, Truck, User, Package, AlertCircle } from 'lucide-react'
 import { useFleet, useVehicles, useDrivers } from '@/hooks/useFleet'
+import { useRayons } from '@/hooks/useCustomers'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingCards } from '@/components/shared/LoadingState'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -22,7 +23,7 @@ export default function FleetPage() {
   const today = format(new Date(), 'yyyy-MM-dd')
   const [date, setDate] = useState(today)
   const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ vehicleId: '', driverId: '', date, initialLoad: '' })
+  const [form, setForm] = useState({ vehicleId: '', driverId: '', rayonId: '', date, initialLoad: '' })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
@@ -30,6 +31,7 @@ export default function FleetPage() {
   const { data: fleet, isLoading } = useFleet(date)
   const { data: vehicles } = useVehicles()
   const { data: drivers } = useDrivers()
+  const { data: rayons } = useRayons()
 
   async function handleActivate(e: React.FormEvent) {
     e.preventDefault()
@@ -94,13 +96,24 @@ export default function FleetPage() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
+                  <Label>Rayon</Label>
+                  <Select value={form.rayonId} onValueChange={v => setForm(f => ({ ...f, rayonId: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Pilih rayon..." /></SelectTrigger>
+                    <SelectContent>
+                      {(rayons?.data ?? []).map((r: any) => (
+                        <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
                   <Label>Muatan Awal (sak)</Label>
                   <Input type="number" min={1} value={form.initialLoad} onChange={e => setForm(f => ({ ...f, initialLoad: e.target.value }))} required />
                 </div>
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={() => setOpen(false)}>Batal</Button>
-                  <Button type="submit" disabled={submitting || !form.vehicleId || !form.driverId}>
+                  <Button type="submit" disabled={submitting || !form.vehicleId || !form.driverId || !form.rayonId}>
                     {submitting ? 'Menyimpan...' : 'Aktifkan'}
                   </Button>
                 </DialogFooter>
