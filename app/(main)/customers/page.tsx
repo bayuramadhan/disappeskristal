@@ -21,7 +21,7 @@ import { useRole } from '@/hooks/useRole'
 const TYPE_OPTIONS = ['WARUNG', 'DEPOT', 'TOKO']
 
 export default function CustomersPage() {
-  const [filters, setFilters] = useState({ search: '', type: '', rayonId: '', page: 1 })
+  const [filters, setFilters] = useState({ search: '', customerType: '', rayonId: '', page: 1 })
   const [newOpen, setNewOpen] = useState(false)
   const [form, setForm] = useState({ name: '', phone: '', address: '', customerType: 'WARUNG', rayonId: '' })
   const [submitting, setSubmitting] = useState(false)
@@ -112,7 +112,7 @@ export default function CustomersPage() {
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input value={filters.search} onChange={e => setFilter('search', e.target.value)} placeholder="Cari nama pelanggan..." className="pl-9" />
         </div>
-        <Select value={filters.type || 'all'} onValueChange={v => setFilter('type', v === 'all' ? '' : v)}>
+        <Select value={filters.customerType || 'all'} onValueChange={v => setFilter('customerType', v === 'all' ? '' : v)}>
           <SelectTrigger className="w-32"><SelectValue placeholder="Tipe" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="all">Semua Tipe</SelectItem>
