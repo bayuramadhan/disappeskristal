@@ -49,7 +49,7 @@ export default function FleetPage() {
       } else {
         setOpen(false)
         mutate(`/api/fleet?date=${date}`)
-        setForm({ vehicleId: '', driverId: '', date, initialLoad: '' })
+        setForm({ vehicleId: '', driverId: '', rayonId: '', date, initialLoad: '' })
       }
     } finally {
       setSubmitting(false)
