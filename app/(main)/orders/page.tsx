@@ -23,7 +23,7 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Textarea } from '@/components/ui/textarea'
 import { formatCurrency } from '@/lib/utils'
-import useSWR, { mutate } from 'swr'
+import useSWR, { mutate as globalMutate } from 'swr'
 import { fetcher } from '@/lib/fetcher'
 
 const STATUS_OPTIONS  = ['CREATED', 'CONFIRMED', 'LOADED', 'DELIVERED', 'PARTIAL', 'RETURNED', 'CANCELLED']
@@ -64,7 +64,7 @@ export default function OrdersPage() {
       })
       if (res.ok) {
         setNewOrderOpen(false)
-        mutate('/api/orders')
+        globalMutate(key => typeof key === 'string' && key.startsWith('/api/orders'))
         setNewOrderForm({ customerId: '', orderChannel: 'PREORDER', deliveryDate: today, orderedQty: '', pricePerUnit: '', notes: '' })
         toast({ title: 'Pesanan berhasil dibuat', variant: 'success' })
       } else {
