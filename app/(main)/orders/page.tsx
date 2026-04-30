@@ -334,7 +334,7 @@ export default function OrdersPage() {
                   <TableHead>Channel</TableHead>
                   <TableHead>Tanggal Kirim</TableHead>
                   <TableHead className="text-right">Qty (sak)</TableHead>
-                  <TableHead className="text-right">Nilai</TableHead>
+                  <TableHead className="text-right">Nilai Pesanan</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
