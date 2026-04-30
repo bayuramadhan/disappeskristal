@@ -141,7 +141,13 @@ export default function FleetPage() {
                   <Label>Kendaraan <span className="text-destructive">*</span></Label>
                   <Select value={form.vehicleId} onValueChange={v => {
                     const assignedDriver = (drivers ?? []).find((d: any) => d.assignedVehicleId === v)
-                    setForm(f => ({ ...f, vehicleId: v, driverId: assignedDriver?.id ?? f.driverId }))
+                    const vehicle = (vehicles ?? []).find((veh: any) => veh.id === v)
+                    setForm(f => ({
+                      ...f,
+                      vehicleId: v,
+                      driverId: assignedDriver?.id ?? f.driverId,
+                      initialLoad: vehicle?.capacitySak ? String(vehicle.capacitySak) : f.initialLoad,
+                    }))
                   }}>
                     <SelectTrigger><SelectValue placeholder="Pilih kendaraan..." /></SelectTrigger>
                     <SelectContent>
@@ -179,7 +185,12 @@ export default function FleetPage() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Muatan Awal (sak) <span className="text-destructive">*</span></Label>
+                  <div className="flex items-center justify-between">
+                    <Label>Muatan Awal (sak) <span className="text-destructive">*</span></Label>
+                    {form.vehicleId && form.initialLoad && (
+                      <span className="text-xs text-muted-foreground">Dari kapasitas kendaraan</span>
+                    )}
+                  </div>
                   <Input type="number" min={1} value={form.initialLoad} onChange={e => setForm(f => ({ ...f, initialLoad: e.target.value }))} placeholder="0" required />
                 </div>
                 <div className="space-y-1.5">
