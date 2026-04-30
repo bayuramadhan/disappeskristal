@@ -54,7 +54,7 @@ export default function FleetPage() {
         body: JSON.stringify({
           ...form,
           initialLoad: Number(form.initialLoad),
-          helperName: form.helperName || null,
+          helperName: form.helperName || undefined,
         }),
       })
       const json = await res.json()
