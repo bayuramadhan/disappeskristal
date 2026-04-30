@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Search, Plus, Pencil } from 'lucide-react'
+import { Search, Plus, Pencil, Trash2 } from 'lucide-react'
 import useSWR, { mutate } from 'swr'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingState } from '@/components/shared/LoadingState'
@@ -30,6 +30,15 @@ export default function RayonsPage() {
   const { toast } = useToast()
   const key = `/api/rayons${search ? `?search=${encodeURIComponent(search)}` : ''}`
   const { data: rayons, isLoading } = useSWR(key)
+
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`Hapus rayon "${name}"?`)) return
+    const res  = await fetch(`/api/rayons/${id}`, { method: 'DELETE' })
+    const json = await res.json()
+    if (!res.ok) { toast({ title: 'Gagal menghapus', description: json.message, variant: 'destructive' }); return }
+    mutate(key)
+    toast({ title: 'Rayon dihapus', description: name })
+  }
 
   function openCreate() {
     setEditId(null)
@@ -143,9 +152,14 @@ export default function RayonsPage() {
                     </TableCell>
                     {isAdmin && (
                       <TableCell>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(r)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(r)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDelete(r.id, r.name)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                     )}
                   </TableRow>

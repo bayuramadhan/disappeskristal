@@ -59,3 +59,31 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return apiServerError(err)
   }
 }
+
+// ─── DELETE /api/rayons/[id] — soft delete ────────────────────────────────────
+export async function DELETE(_req: NextRequest, { params }: Params) {
+  const { user, error } = await requireAuth()
+  if (error) return error
+  if (user.role !== 'ADMIN') return apiError('Akses ditolak', 403)
+
+  try {
+    const existing = await prisma.rayon.findFirst({
+      where: { id: params.id, deletedAt: null },
+      include: { _count: { select: { customers: true, orders: true } } },
+    })
+    if (!existing) return apiNotFound('Rayon')
+
+    if (existing._count.customers > 0 || existing._count.orders > 0) {
+      return apiError('Rayon tidak dapat dihapus karena masih memiliki pelanggan atau order', 409)
+    }
+
+    await prisma.rayon.update({
+      where: { id: params.id },
+      data:  { deletedAt: new Date(), activeStatus: false },
+    })
+
+    return apiSuccess(null, 'Rayon berhasil dihapus')
+  } catch (err) {
+    return apiServerError(err)
+  }
+}
