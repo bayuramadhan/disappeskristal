@@ -196,6 +196,7 @@ model FleetDailyStatus {
 
 model Order {
   id            String       @id @default(cuid())
+  orderNumber   String?      @unique
   customerId    String
   vehicleId     String?
   rayonId       String?

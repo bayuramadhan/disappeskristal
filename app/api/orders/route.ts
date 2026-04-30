@@ -85,8 +85,16 @@ export async function POST(req: NextRequest) {
       resolvedRayonId = customer.rayonId ?? undefined
     }
 
+    // Generate orderNumber: ORD-YYYYMMDD-XXX
+    const dateStr    = new Date(deliveryDate).toISOString().slice(0, 10).replace(/-/g, '')
+    const todayCount = await prisma.order.count({
+      where: { orderNumber: { startsWith: `ORD-${dateStr}-` } },
+    })
+    const orderNumber = `ORD-${dateStr}-${String(todayCount + 1).padStart(3, '0')}`
+
     const order = await prisma.order.create({
       data: {
+        orderNumber,
         customerId,
         vehicleId:    vehicleId ?? null,
         rayonId:      resolvedRayonId ?? null,
