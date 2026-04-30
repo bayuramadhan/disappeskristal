@@ -139,7 +139,10 @@ export default function FleetPage() {
               <form onSubmit={handleActivate} className="space-y-4">
                 <div className="space-y-1.5">
                   <Label>Kendaraan <span className="text-destructive">*</span></Label>
-                  <Select value={form.vehicleId} onValueChange={v => setForm(f => ({ ...f, vehicleId: v }))}>
+                  <Select value={form.vehicleId} onValueChange={v => {
+                    const assignedDriver = (drivers ?? []).find((d: any) => d.assignedVehicleId === v)
+                    setForm(f => ({ ...f, vehicleId: v, driverId: assignedDriver?.id ?? f.driverId }))
+                  }}>
                     <SelectTrigger><SelectValue placeholder="Pilih kendaraan..." /></SelectTrigger>
                     <SelectContent>
                       {(vehicles ?? []).filter((v: any) => v.status === 'ACTIVE').map((v: any) => (
@@ -149,7 +152,12 @@ export default function FleetPage() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Driver <span className="text-destructive">*</span></Label>
+                  <div className="flex items-center justify-between">
+                    <Label>Driver <span className="text-destructive">*</span></Label>
+                    {form.driverId && (drivers ?? []).find((d: any) => d.assignedVehicleId === form.vehicleId && d.id === form.driverId) && (
+                      <span className="text-xs text-muted-foreground">Terisi otomatis</span>
+                    )}
+                  </div>
                   <Select value={form.driverId} onValueChange={v => setForm(f => ({ ...f, driverId: v }))}>
                     <SelectTrigger><SelectValue placeholder="Pilih driver..." /></SelectTrigger>
                     <SelectContent>
