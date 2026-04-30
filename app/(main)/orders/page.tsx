@@ -399,9 +399,15 @@ export default function OrdersPage() {
                       <div><p className="text-muted-foreground text-xs">Terkirim</p><p className="font-semibold text-emerald-600">{o.deliveredQty ?? 0} sak</p></div>
                       <div><p className="text-muted-foreground text-xs">Dikembalikan</p><p className="font-semibold text-destructive">{o.returnedQty ?? 0} sak</p></div>
                     </div>
-                    <div className="rounded-lg bg-muted p-3">
-                      <p className="text-xs text-muted-foreground mb-1">Total Nilai</p>
-                      <p className="text-xl font-bold">{formatCurrency((o.deliveredQty ?? 0) * o.pricePerUnit)}</p>
+                    <div className="rounded-lg bg-muted p-3 grid grid-cols-2 gap-3">
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Nilai Pesanan</p>
+                        <p className="text-lg font-bold">{formatCurrency(o.orderedQty * o.pricePerUnit)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs text-muted-foreground mb-1">Nilai Terkirim</p>
+                        <p className="text-lg font-bold text-emerald-600">{formatCurrency((o.deliveredQty ?? 0) * o.pricePerUnit)}</p>
+                      </div>
                     </div>
                     {o.notes && (
                       <div>
