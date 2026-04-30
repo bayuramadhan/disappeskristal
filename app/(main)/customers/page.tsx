@@ -128,6 +128,9 @@ export default function CustomersPage() {
               {(rayons ?? []).map((r: any) => <SelectItem key={r.id} value={r.id}>{r.name}</SelectItem>)}
             </SelectContent>
           </Select>
+          {!form.rayonId && (
+            <p className="text-xs text-amber-600">Tanpa rayon, harga jual tidak akan otomatis terisi saat order.</p>
+          )}
         </div>
       </div>
       <div className="space-y-1.5">
