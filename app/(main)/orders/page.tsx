@@ -444,7 +444,9 @@ export default function OrdersPage() {
                             <Button
                               size="sm" className="flex-1"
                               disabled={actionLoading}
-                              onClick={() => updateOrderStatus(o.id, 'CONFIRMED')}
+                              onClick={() => {
+                                if (confirm('Konfirmasi pesanan ini?')) updateOrderStatus(o.id, 'CONFIRMED')
+                              }}
                             >
                               Konfirmasi
                             </Button>
