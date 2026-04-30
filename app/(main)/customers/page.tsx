@@ -17,6 +17,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { mutate } from 'swr'
 import { useRole } from '@/hooks/useRole'
+import { useToast } from '@/hooks/use-toast'
 
 const TYPE_OPTIONS = ['WARUNG', 'DEPOT', 'TOKO']
 const emptyForm = { name: '', phone: '', address: '', customerType: 'WARUNG', rayonId: '', defaultPrice: '' }
@@ -31,6 +32,7 @@ export default function CustomersPage() {
   const [error, setError]       = useState('')
 
   const { canManage, isAdmin } = useRole()
+  const { toast } = useToast()
   const { data, isLoading }    = useCustomers(filters)
   const { data: rayons }       = useRayons()
 
@@ -71,6 +73,7 @@ export default function CustomersPage() {
       setNewOpen(false)
       setForm(emptyForm)
       mutate(apiKey)
+      toast({ title: 'Pelanggan ditambahkan', description: form.name })
     } finally {
       setSubmitting(false)
     }
@@ -92,6 +95,7 @@ export default function CustomersPage() {
       if (!res.ok) { setError(json.message ?? 'Gagal menyimpan'); return }
       setEditOpen(false)
       mutate(apiKey)
+      toast({ title: 'Pelanggan diperbarui', description: form.name })
     } finally {
       setSubmitting(false)
     }
@@ -101,8 +105,9 @@ export default function CustomersPage() {
     if (!confirm(`Hapus pelanggan ${name}?`)) return
     const res  = await fetch(`/api/customers/${id}`, { method: 'DELETE' })
     const json = await res.json()
-    if (!res.ok) { alert(json.message ?? 'Gagal menghapus'); return }
+    if (!res.ok) { toast({ title: 'Gagal menghapus', description: json.message, variant: 'destructive' }); return }
     mutate(apiKey)
+    toast({ title: 'Pelanggan dihapus', description: name })
   }
 
   const formFields = (

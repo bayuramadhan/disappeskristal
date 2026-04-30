@@ -14,6 +14,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useRole } from '@/hooks/useRole'
+import { useToast } from '@/hooks/use-toast'
 
 const emptyForm = { name: '', coverageArea: '', activeStatus: true }
 
@@ -26,6 +27,7 @@ export default function RayonsPage() {
   const [error, setError] = useState('')
 
   const { isAdmin } = useRole()
+  const { toast } = useToast()
   const key = `/api/rayons${search ? `?search=${encodeURIComponent(search)}` : ''}`
   const { data: rayons, isLoading } = useSWR(key)
 
@@ -57,6 +59,7 @@ export default function RayonsPage() {
       if (!res.ok) { setError(json.message ?? 'Gagal menyimpan'); return }
       setOpen(false)
       mutate(key)
+      toast({ title: editId ? 'Rayon diperbarui' : 'Rayon ditambahkan', description: form.name })
     } finally {
       setSubmitting(false)
     }

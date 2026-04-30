@@ -16,6 +16,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useRole } from '@/hooks/useRole'
+import { useToast } from '@/hooks/use-toast'
 import { formatCurrency } from '@/lib/utils'
 
 const CUSTOMER_TYPES = ['WARUNG', 'DEPOT', 'TOKO']
@@ -54,6 +55,7 @@ export default function PriceProfilesPage() {
   const [error, setError]     = useState('')
 
   const { isAdmin } = useRole()
+  const { toast } = useToast()
   const key = buildKey(filters)
   const { data: profiles, isLoading } = useSWR(key)
   const { data: rayons }              = useSWR('/api/rayons')
@@ -102,6 +104,7 @@ export default function PriceProfilesPage() {
       if (!res.ok) { setError(json.message ?? 'Gagal menyimpan'); return }
       setOpen(false)
       mutate(key)
+      toast({ title: editId ? 'Harga diperbarui' : 'Harga ditambahkan', description: `${form.customerType} / ${CHANNEL_LABELS[form.channel]}` })
     } finally {
       setSubmitting(false)
     }
@@ -111,8 +114,9 @@ export default function PriceProfilesPage() {
     if (!confirm(`Hapus harga "${label}"?`)) return
     const res  = await fetch(`/api/price-profiles/${id}`, { method: 'DELETE' })
     const json = await res.json()
-    if (!res.ok) { alert(json.message ?? 'Gagal menghapus'); return }
+    if (!res.ok) { toast({ title: 'Gagal menghapus', description: json.message, variant: 'destructive' }); return }
     mutate(key)
+    toast({ title: 'Harga dihapus', description: label })
   }
 
   const razonList = (rayons ?? []) as any[]

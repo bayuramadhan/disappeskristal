@@ -16,6 +16,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useRole } from '@/hooks/useRole'
+import { useToast } from '@/hooks/use-toast'
 
 const STATUS_OPTIONS = ['ACTIVE', 'INACTIVE', 'ON_LEAVE']
 const STATUS_LABELS: Record<string, string> = { ACTIVE: 'Aktif', INACTIVE: 'Tidak Aktif', ON_LEAVE: 'Cuti' }
@@ -32,6 +33,7 @@ export default function DriversPage() {
   const [error, setError] = useState('')
 
   const { isAdmin } = useRole()
+  const { toast } = useToast()
   const router = useRouter()
   const key = `/api/drivers${search ? `?search=${encodeURIComponent(search)}` : ''}`
 
@@ -39,8 +41,9 @@ export default function DriversPage() {
     if (!confirm(`Hapus driver ${name}?`)) return
     const res = await fetch(`/api/drivers/${id}`, { method: 'DELETE' })
     const json = await res.json()
-    if (!res.ok) { alert(json.message ?? 'Gagal menghapus'); return }
+    if (!res.ok) { toast({ title: 'Gagal menghapus', description: json.message, variant: 'destructive' }); return }
     mutate(key)
+    toast({ title: 'Driver dihapus', description: name })
   }
   const { data: drivers, isLoading } = useSWR(key)
   const { data: vehicles } = useSWR('/api/vehicles')
@@ -79,6 +82,7 @@ export default function DriversPage() {
       if (!res.ok) { setError(json.message ?? 'Gagal menyimpan'); return }
       setOpen(false)
       mutate(key)
+      toast({ title: editId ? 'Driver diperbarui' : 'Driver ditambahkan', description: form.name })
     } finally {
       setSubmitting(false)
     }

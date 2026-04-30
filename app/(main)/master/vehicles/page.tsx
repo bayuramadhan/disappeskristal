@@ -15,6 +15,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useRole } from '@/hooks/useRole'
+import { useToast } from '@/hooks/use-toast'
 
 const STATUS_OPTIONS = ['ACTIVE', 'INACTIVE', 'MAINTENANCE']
 const STATUS_LABELS: Record<string, string> = { ACTIVE: 'Aktif', INACTIVE: 'Tidak Aktif', MAINTENANCE: 'Maintenance' }
@@ -31,6 +32,7 @@ export default function VehiclesPage() {
   const [error, setError] = useState('')
 
   const { isAdmin } = useRole()
+  const { toast } = useToast()
   const key = `/api/vehicles${search ? `?search=${encodeURIComponent(search)}` : ''}`
   const { data: vehicles, isLoading } = useSWR(key)
 
@@ -38,8 +40,9 @@ export default function VehiclesPage() {
     if (!confirm(`Hapus kendaraan ${plateNumber}?`)) return
     const res = await fetch(`/api/vehicles/${id}`, { method: 'DELETE' })
     const json = await res.json()
-    if (!res.ok) { alert(json.message ?? 'Gagal menghapus'); return }
+    if (!res.ok) { toast({ title: 'Gagal menghapus', description: json.message, variant: 'destructive' }); return }
     mutate(key)
+    toast({ title: 'Kendaraan dihapus', description: plateNumber })
   }
 
   function openCreate() {
@@ -76,6 +79,7 @@ export default function VehiclesPage() {
       if (!res.ok) { setError(json.message ?? 'Gagal menyimpan'); return }
       setOpen(false)
       mutate(key)
+      toast({ title: editId ? 'Kendaraan diperbarui' : 'Kendaraan ditambahkan', description: form.plateNumber })
     } finally {
       setSubmitting(false)
     }
