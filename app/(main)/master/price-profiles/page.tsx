@@ -19,7 +19,7 @@ import { useRole } from '@/hooks/useRole'
 import { formatCurrency } from '@/lib/utils'
 
 const CUSTOMER_TYPES = ['WARUNG', 'DEPOT', 'TOKO']
-const CHANNELS = ['PREORDER', 'HOTLINE', 'CANVAS', 'ADMIN_INPUT']
+const CHANNELS = ['PREORDER', 'HOTLINE', 'CANVAS']
 const CHANNEL_LABELS: Record<string, string> = {
   PREORDER:    'Pre-order',
   HOTLINE:     'Hotline',
