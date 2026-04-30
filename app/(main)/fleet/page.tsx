@@ -288,7 +288,7 @@ export default function FleetPage() {
                   )}
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-xs text-muted-foreground">
-                      <span>Muatan terpakai</span>
+                      <span>Sudah terkirim</span>
                       <span className="font-medium">{f.initialLoad - (f.remainingLoad ?? 0)} / {f.initialLoad} sak</span>
                     </div>
                     <Progress value={loadPct} className="h-2" />
