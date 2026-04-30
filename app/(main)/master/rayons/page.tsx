@@ -79,11 +79,11 @@ export default function RayonsPage() {
           <DialogHeader><DialogTitle>{editId ? 'Edit Rayon' : 'Tambah Rayon'}</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Nama Rayon</Label>
+              <Label>Nama Rayon <span className="text-destructive">*</span></Label>
               <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Rayon Utara" required />
             </div>
             <div className="space-y-1.5">
-              <Label>Area Cakupan</Label>
+              <Label>Area Cakupan <span className="text-muted-foreground text-xs">(opsional)</span></Label>
               <Input value={form.coverageArea} onChange={e => setForm(f => ({ ...f, coverageArea: e.target.value }))} placeholder="Kota Utara & Sekitar" />
             </div>
             <div className="flex items-center gap-2">

@@ -103,15 +103,15 @@ export default function DriversPage() {
           <DialogHeader><DialogTitle>{editId ? 'Edit Driver' : 'Tambah Driver'}</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Nama</Label>
+              <Label>Nama <span className="text-destructive">*</span></Label>
               <Input value={form.name} onChange={e => setForm(f => ({ ...f, name: e.target.value }))} placeholder="Nama lengkap" required />
             </div>
             <div className="space-y-1.5">
-              <Label>No. HP</Label>
+              <Label>No. HP <span className="text-muted-foreground text-xs">(opsional)</span></Label>
               <Input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="08xx-xxxx-xxxx" />
             </div>
             <div className="space-y-1.5">
-              <Label>Kendaraan</Label>
+              <Label>Kendaraan <span className="text-muted-foreground text-xs">(opsional)</span></Label>
               <Select value={form.assignedVehicleId || 'none'} onValueChange={v => setForm(f => ({ ...f, assignedVehicleId: v === 'none' ? '' : v }))}>
                 <SelectTrigger><SelectValue placeholder="Pilih kendaraan..." /></SelectTrigger>
                 <SelectContent>

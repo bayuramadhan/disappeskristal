@@ -98,16 +98,16 @@ export default function VehiclesPage() {
           <DialogHeader><DialogTitle>{editId ? 'Edit Kendaraan' : 'Tambah Kendaraan'}</DialogTitle></DialogHeader>
           <form onSubmit={handleSubmit} className="space-y-4">
             <div className="space-y-1.5">
-              <Label>Nomor Plat</Label>
+              <Label>Nomor Plat <span className="text-destructive">*</span></Label>
               <Input value={form.plateNumber} onChange={e => setForm(f => ({ ...f, plateNumber: e.target.value }))} placeholder="B 1234 ABC" required />
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
-                <Label>Kapasitas (sak)</Label>
+                <Label>Kapasitas (sak) <span className="text-destructive">*</span></Label>
                 <Input type="number" min={0} value={form.capacitySak} onChange={e => setForm(f => ({ ...f, capacitySak: e.target.value }))} required />
               </div>
               <div className="space-y-1.5">
-                <Label>Biaya Harian (Rp)</Label>
+                <Label>Biaya Harian (Rp) <span className="text-destructive">*</span></Label>
                 <Input type="number" min={0} value={form.operationalCostPerDay} onChange={e => setForm(f => ({ ...f, operationalCostPerDay: e.target.value }))} required />
               </div>
             </div>
