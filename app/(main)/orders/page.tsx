@@ -423,22 +423,33 @@ export default function OrdersPage() {
           <form onSubmit={submitDeliveryLog} className="space-y-4">
             <div className="space-y-1.5">
               <Label>Armada <span className="text-destructive">*</span></Label>
-              <Select value={deliveryForm.vehicleId} onValueChange={v => {
-                const fleet = (activeFleet ?? []).find((f: any) => f.vehicleId === v)
-                setDeliveryForm(f => ({ ...f, vehicleId: v, driverId: fleet?.driverId ?? '' }))
-              }}>
-                <SelectTrigger><SelectValue placeholder="Pilih kendaraan aktif..." /></SelectTrigger>
-                <SelectContent>
-                  {(activeFleet ?? []).map((f: any) => (
-                    <SelectItem key={f.vehicleId} value={f.vehicleId}>
-                      {f.vehicle?.plateNumber} — {f.driver?.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {(activeFleet ?? []).length === 0 && (
-                <p className="text-xs text-amber-600">Tidak ada armada aktif hari ini</p>
-              )}
+              {(() => {
+                const matchedFleet = (activeFleet ?? []).filter((f: any) =>
+                  !deliveryTarget?.rayonId || f.rayonId === deliveryTarget.rayonId
+                )
+                return (
+                  <>
+                    <Select value={deliveryForm.vehicleId} onValueChange={v => {
+                      const fleet = (activeFleet ?? []).find((f: any) => f.vehicleId === v)
+                      setDeliveryForm(f => ({ ...f, vehicleId: v, driverId: fleet?.driverId ?? '' }))
+                    }}>
+                      <SelectTrigger><SelectValue placeholder="Pilih kendaraan aktif..." /></SelectTrigger>
+                      <SelectContent>
+                        {matchedFleet.map((f: any) => (
+                          <SelectItem key={f.vehicleId} value={f.vehicleId}>
+                            {f.vehicle?.plateNumber} — {f.driver?.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    {matchedFleet.length === 0 && (
+                      <p className="text-xs text-amber-600">
+                        Tidak ada armada aktif untuk rayon ini hari ini
+                      </p>
+                    )}
+                  </>
+                )
+              })()}
             </div>
             <div className="grid grid-cols-2 gap-3">
               <div className="space-y-1.5">
