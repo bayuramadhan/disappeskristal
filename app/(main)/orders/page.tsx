@@ -437,11 +437,17 @@ export default function OrdersPage() {
                       <SelectContent>
                         {matchedFleet.map((f: any) => (
                           <SelectItem key={f.vehicleId} value={f.vehicleId}>
-                            {f.vehicle?.plateNumber} — {f.driver?.name}
+                            {f.vehicle?.plateNumber} — {f.driver?.name} (sisa {f.remainingLoad} sak)
                           </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
+                    {deliveryForm.vehicleId && (() => {
+                      const sel = (activeFleet ?? []).find((f: any) => f.vehicleId === deliveryForm.vehicleId)
+                      return sel ? (
+                        <p className="text-xs text-muted-foreground">Sisa muatan: <span className="font-medium">{sel.remainingLoad} sak</span></p>
+                      ) : null
+                    })()}
                     {matchedFleet.length === 0 && (
                       <p className="text-xs text-amber-600">
                         Tidak ada armada aktif untuk rayon ini hari ini
@@ -455,7 +461,11 @@ export default function OrdersPage() {
               <div className="space-y-1.5">
                 <Label>Terkirim (sak) <span className="text-destructive">*</span></Label>
                 <Input
-                  type="number" min={0} max={deliveryTarget?.orderedQty}
+                  type="number" min={0}
+                  max={Math.min(
+                    deliveryTarget?.orderedQty ?? Infinity,
+                    (activeFleet ?? []).find((f: any) => f.vehicleId === deliveryForm.vehicleId)?.remainingLoad ?? Infinity,
+                  )}
                   value={deliveryForm.deliveredQty}
                   onChange={e => setDeliveryForm(f => ({ ...f, deliveredQty: e.target.value }))}
                   placeholder="0" required

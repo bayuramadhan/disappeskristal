@@ -115,6 +115,14 @@ export async function POST(req: NextRequest) {
     // Net qty leaving the vehicle = delivered - returned (returned comes back)
     const netOut = deliveredQty - (returnedQty ?? 0)
 
+    // Validate net qty doesn't exceed remaining load
+    if (fleet && netOut > (fleet.remainingLoad ?? 0)) {
+      return apiError(
+        `Jumlah terkirim melebihi sisa muatan armada (sisa: ${fleet.remainingLoad} sak)`,
+        400,
+      )
+    }
+
     // Run in transaction: create log + update order + update fleet remaining load
     const [log] = await prisma.$transaction([
       prisma.deliveryLog.create({
