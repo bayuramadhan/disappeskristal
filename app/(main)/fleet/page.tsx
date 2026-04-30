@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { format } from 'date-fns'
-import { Plus, Truck, User, Package, AlertCircle } from 'lucide-react'
+import { Plus, Truck, User, Package, MapPin, Clock, ChevronDown, Trash2 } from 'lucide-react'
 import { useFleet, useVehicles, useDrivers } from '@/hooks/useFleet'
 import { useRayons } from '@/hooks/useCustomers'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -18,20 +18,30 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogT
 import { Progress } from '@/components/ui/progress'
 import { mutate } from 'swr'
 import { useRole } from '@/hooks/useRole'
+import { useToast } from '@/hooks/use-toast'
 
 export default function FleetPage() {
   const today = format(new Date(), 'yyyy-MM-dd')
   const [date, setDate] = useState(today)
   const [open, setOpen] = useState(false)
-  const [form, setForm] = useState({ vehicleId: '', driverId: '', rayonId: '', date, initialLoad: '' })
+  const [form, setForm] = useState({ vehicleId: '', driverId: '', rayonId: '', helperName: '', date, initialLoad: '' })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
 
+  // Update dialog state
+  const [updateOpen, setUpdateOpen] = useState(false)
+  const [updateTarget, setUpdateTarget] = useState<any>(null)
+  const [updateForm, setUpdateForm] = useState({ remainingLoad: '', departureTime: '' })
+  const [updating, setUpdating] = useState(false)
+
   const { canWrite } = useRole()
+  const { toast } = useToast()
   const { data: fleet, isLoading } = useFleet(date)
   const { data: vehicles } = useVehicles()
   const { data: drivers } = useDrivers()
   const { data: rayons } = useRayons()
+
+  const fleetKey = `/api/fleet?date=${date}`
 
   async function handleActivate(e: React.FormEvent) {
     e.preventDefault()
@@ -41,18 +51,72 @@ export default function FleetPage() {
       const res = await fetch('/api/fleet', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, initialLoad: Number(form.initialLoad) }),
+        body: JSON.stringify({
+          ...form,
+          initialLoad: Number(form.initialLoad),
+          helperName: form.helperName || null,
+        }),
       })
       const json = await res.json()
       if (!res.ok) {
         setError(json.message ?? 'Gagal mengaktifkan armada')
       } else {
         setOpen(false)
-        mutate(`/api/fleet?date=${date}`)
-        setForm({ vehicleId: '', driverId: '', rayonId: '', date, initialLoad: '' })
+        mutate(fleetKey)
+        setForm({ vehicleId: '', driverId: '', rayonId: '', helperName: '', date, initialLoad: '' })
+        const v = (vehicles ?? []).find((v: any) => v.id === form.vehicleId)
+        toast({ title: 'Armada diaktifkan', description: v?.plateNumber ?? 'Kendaraan berhasil diaktifkan' })
       }
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  function openUpdate(f: any) {
+    setUpdateTarget(f)
+    setUpdateForm({
+      remainingLoad: String(f.remainingLoad ?? f.initialLoad),
+      departureTime: f.departureTime ? format(new Date(f.departureTime), "yyyy-MM-dd'T'HH:mm") : '',
+    })
+    setUpdateOpen(true)
+  }
+
+  async function handleUpdate(e: React.FormEvent) {
+    e.preventDefault()
+    if (!updateTarget) return
+    setUpdating(true)
+    try {
+      const body: Record<string, any> = {}
+      if (updateForm.remainingLoad !== '') body.remainingLoad = Number(updateForm.remainingLoad)
+      if (updateForm.departureTime) body.departureTime = updateForm.departureTime
+
+      const res = await fetch(`/api/fleet/${updateTarget.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        toast({ title: 'Gagal memperbarui', description: json.message, variant: 'destructive' })
+      } else {
+        setUpdateOpen(false)
+        mutate(fleetKey)
+        toast({ title: 'Armada diperbarui', description: updateTarget.vehicle?.plateNumber })
+      }
+    } finally {
+      setUpdating(false)
+    }
+  }
+
+  async function handleDeactivate(f: any) {
+    if (!confirm(`Nonaktifkan armada ${f.vehicle?.plateNumber ?? ''}?`)) return
+    const res = await fetch(`/api/fleet/${f.id}`, { method: 'DELETE' })
+    const json = await res.json()
+    if (!res.ok) {
+      toast({ title: 'Gagal menonaktifkan', description: json.message, variant: 'destructive' })
+    } else {
+      mutate(fleetKey)
+      toast({ title: 'Armada dinonaktifkan', description: f.vehicle?.plateNumber })
     }
   }
 
@@ -74,7 +138,7 @@ export default function FleetPage() {
               <DialogHeader><DialogTitle>Aktifkan Armada</DialogTitle></DialogHeader>
               <form onSubmit={handleActivate} className="space-y-4">
                 <div className="space-y-1.5">
-                  <Label>Kendaraan</Label>
+                  <Label>Kendaraan <span className="text-destructive">*</span></Label>
                   <Select value={form.vehicleId} onValueChange={v => setForm(f => ({ ...f, vehicleId: v }))}>
                     <SelectTrigger><SelectValue placeholder="Pilih kendaraan..." /></SelectTrigger>
                     <SelectContent>
@@ -85,7 +149,7 @@ export default function FleetPage() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Driver</Label>
+                  <Label>Driver <span className="text-destructive">*</span></Label>
                   <Select value={form.driverId} onValueChange={v => setForm(f => ({ ...f, driverId: v }))}>
                     <SelectTrigger><SelectValue placeholder="Pilih driver..." /></SelectTrigger>
                     <SelectContent>
@@ -96,7 +160,7 @@ export default function FleetPage() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Rayon</Label>
+                  <Label>Rayon <span className="text-destructive">*</span></Label>
                   <Select value={form.rayonId} onValueChange={v => setForm(f => ({ ...f, rayonId: v }))}>
                     <SelectTrigger><SelectValue placeholder="Pilih rayon..." /></SelectTrigger>
                     <SelectContent>
@@ -107,13 +171,17 @@ export default function FleetPage() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Muatan Awal (sak)</Label>
-                  <Input type="number" min={1} value={form.initialLoad} onChange={e => setForm(f => ({ ...f, initialLoad: e.target.value }))} required />
+                  <Label>Muatan Awal (sak) <span className="text-destructive">*</span></Label>
+                  <Input type="number" min={1} value={form.initialLoad} onChange={e => setForm(f => ({ ...f, initialLoad: e.target.value }))} placeholder="0" required />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Nama Helper <span className="text-muted-foreground text-xs">(opsional)</span></Label>
+                  <Input value={form.helperName} onChange={e => setForm(f => ({ ...f, helperName: e.target.value }))} placeholder="Nama kenek / helper" />
                 </div>
                 {error && <p className="text-sm text-destructive">{error}</p>}
                 <DialogFooter>
                   <Button type="button" variant="outline" onClick={() => setOpen(false)}>Batal</Button>
-                  <Button type="submit" disabled={submitting || !form.vehicleId || !form.driverId || !form.rayonId}>
+                  <Button type="submit" disabled={submitting || !form.vehicleId || !form.driverId || !form.rayonId || !form.initialLoad}>
                     {submitting ? 'Menyimpan...' : 'Aktifkan'}
                   </Button>
                 </DialogFooter>
@@ -122,6 +190,41 @@ export default function FleetPage() {
           </Dialog>
         }
       />
+
+      {/* Update dialog */}
+      <Dialog open={updateOpen} onOpenChange={setUpdateOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Perbarui Armada — {updateTarget?.vehicle?.plateNumber}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleUpdate} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Waktu Berangkat <span className="text-muted-foreground text-xs">(opsional)</span></Label>
+              <Input
+                type="datetime-local"
+                value={updateForm.departureTime}
+                onChange={e => setUpdateForm(f => ({ ...f, departureTime: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-1.5">
+              <Label>Sisa Muatan (sak)</Label>
+              <Input
+                type="number"
+                min={0}
+                max={updateTarget?.initialLoad}
+                value={updateForm.remainingLoad}
+                onChange={e => setUpdateForm(f => ({ ...f, remainingLoad: e.target.value }))}
+                required
+              />
+              <p className="text-xs text-muted-foreground">Muatan awal: {updateTarget?.initialLoad} sak</p>
+            </div>
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setUpdateOpen(false)}>Batal</Button>
+              <Button type="submit" disabled={updating}>{updating ? 'Menyimpan...' : 'Simpan'}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* Date filter */}
       <div className="flex items-center gap-3 mb-6">
@@ -145,7 +248,9 @@ export default function FleetPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {fleet.map((f: any) => {
-            const loadPct = f.initialLoad > 0 ? Math.round(((f.initialLoad - (f.remainingLoad ?? 0)) / f.initialLoad) * 100) : 0
+            const loadPct = f.initialLoad > 0
+              ? Math.round(((f.initialLoad - (f.remainingLoad ?? 0)) / f.initialLoad) * 100)
+              : 0
             return (
               <Card key={f.id} className="relative">
                 <CardHeader className="pb-3">
@@ -154,7 +259,7 @@ export default function FleetPage() {
                       <Truck className="h-5 w-5 text-sky-600" />
                       <div>
                         <CardTitle className="text-base">{f.vehicle?.plateNumber ?? '-'}</CardTitle>
-                        <p className="text-xs text-muted-foreground mt-0.5">{f.vehicle?.vehicleType ?? ''}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5">{f.rayon?.name ?? '-'}</p>
                       </div>
                     </div>
                     <Badge variant={f.activeStatus ? 'success' : 'secondary'}>
@@ -166,7 +271,14 @@ export default function FleetPage() {
                   <div className="flex items-center gap-2 text-sm">
                     <User className="h-4 w-4 text-muted-foreground shrink-0" />
                     <span>{f.driver?.name ?? '-'}</span>
+                    {f.helperName && <span className="text-muted-foreground text-xs">+ {f.helperName}</span>}
                   </div>
+                  {f.departureTime && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <Clock className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span>Berangkat {format(new Date(f.departureTime), 'HH:mm')}</span>
+                    </div>
+                  )}
                   <div className="space-y-1.5">
                     <div className="flex justify-between text-xs text-muted-foreground">
                       <span>Muatan terpakai</span>
@@ -174,12 +286,31 @@ export default function FleetPage() {
                     </div>
                     <Progress value={loadPct} className="h-2" />
                   </div>
-                  <div className="flex items-center gap-2 text-sm">
-                    <Package className="h-4 w-4 text-muted-foreground shrink-0" />
-                    <span>Sisa: <span className="font-semibold">{f.remainingLoad ?? f.initialLoad} sak</span></span>
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 text-sm">
+                      <Package className="h-4 w-4 text-muted-foreground shrink-0" />
+                      <span>Sisa: <span className="font-semibold">{f.remainingLoad ?? f.initialLoad} sak</span></span>
+                    </div>
+                    {f.stats && (
+                      <span className="text-xs text-muted-foreground">
+                        {f.stats.deliveredOrders}/{f.stats.totalOrders} pesanan
+                      </span>
+                    )}
                   </div>
-                  {f._count && (
-                    <p className="text-xs text-muted-foreground">{f._count.orders} pesanan terkait</p>
+                  {canWrite && (
+                    <div className="flex gap-2 pt-1 border-t">
+                      <Button size="sm" variant="outline" className="flex-1 h-8 text-xs" onClick={() => openUpdate(f)}>
+                        <ChevronDown className="h-3.5 w-3.5 mr-1" /> Perbarui
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
+                        onClick={() => handleDeactivate(f)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   )}
                 </CardContent>
               </Card>
