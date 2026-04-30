@@ -227,7 +227,7 @@ export default function FleetPage() {
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setUpdateOpen(false)}>Batal</Button>
-              <Button type="submit" disabled={updating}>{updating ? 'Menyimpan...' : 'Simpan'}</Button>
+              <Button type="submit" disabled={updating || !updateForm.departureTime}>{updating ? 'Menyimpan...' : 'Simpan'}</Button>
             </DialogFooter>
           </form>
         </DialogContent>
