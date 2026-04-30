@@ -72,7 +72,6 @@ export default function OrdersPage() {
     if (!customer) { setPriceHint(null); return }
 
     const params = new URLSearchParams({ customerType: customer.customerType, channel: orderChannel })
-    if (customer.rayonId) params.set('rayonId', customer.rayonId)
 
     fetch(`/api/price-profiles?${params}`)
       .then(r => r.json())
