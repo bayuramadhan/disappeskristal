@@ -49,7 +49,6 @@ export default function CustomerDetailPage() {
           <CardContent className="space-y-3">
             <div>
               <p className="font-semibold text-lg">{customer.name}</p>
-              <p className="text-xs text-muted-foreground font-mono">{customer.customerCode}</p>
             </div>
             <div className="flex gap-2">
               <Badge variant="secondary">{customer.customerType}</Badge>

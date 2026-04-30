@@ -21,7 +21,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     if (!customer) return apiNotFound('Customer')
 
     // Last 20 orders
-    const [orders, orderStats] = await Promise.all([
+    const [recentOrders, orderStats] = await Promise.all([
       prisma.order.findMany({
         where:   { customerId: params.id, deletedAt: null },
         orderBy: { deliveryDate: 'desc' },
@@ -35,18 +35,19 @@ export async function GET(_req: NextRequest, { params }: Params) {
       }),
       prisma.order.aggregate({
         where: { customerId: params.id, deletedAt: null, status: { in: ['DELIVERED', 'PARTIAL'] } },
-        _sum:   { deliveredQty: true },
+        _sum:   { deliveredQty: true, returnedQty: true },
         _count: { id: true },
       }),
     ])
 
     return apiSuccess({
       ...customer,
-      orderHistory: orders,
+      recentOrders,
       stats: {
-        totalOrders:    orderStats._count.id,
-        totalDelivered: orderStats._sum.deliveredQty ?? 0,
-        totalRevenue:   orders
+        totalOrders:       orderStats._count.id,
+        totalDeliveredQty: orderStats._sum.deliveredQty ?? 0,
+        totalReturnedQty:  orderStats._sum.returnedQty  ?? 0,
+        totalRevenue:      recentOrders
           .filter(o => ['DELIVERED', 'PARTIAL'].includes(o.status))
           .reduce((sum, o) => sum + o.deliveredQty * o.pricePerUnit, 0),
       },

@@ -2,7 +2,7 @@ import useSWR from 'swr'
 
 interface CustomerFilters {
   search?: string
-  type?: string
+  customerType?: string
   rayonId?: string
   page?: number
 }
