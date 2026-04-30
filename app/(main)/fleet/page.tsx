@@ -307,16 +307,24 @@ export default function FleetPage() {
                   {canWrite && (
                     <div className="flex gap-2 pt-1 border-t">
                       <Button size="sm" variant="outline" className="flex-1 h-8 text-xs" onClick={() => openUpdate(f)}>
-                        <Clock className="h-3.5 w-3.5 mr-1" /> Edit Waktu Berangkat
+                        <Clock className="h-3.5 w-3.5 mr-1" />
+                        {f.departureTime ? 'Edit Waktu Berangkat' : 'Set Waktu Berangkat'}
                       </Button>
-                      {f.activeStatus && (
+                      {f.departureTime ? (
                         <Button
-                          size="sm"
-                          variant="outline"
+                          size="sm" variant="outline"
                           className="flex-1 h-8 text-xs text-destructive border-destructive hover:bg-destructive hover:text-white"
                           onClick={() => handleDeactivate(f)}
                         >
                           Selesai Hari Ini
+                        </Button>
+                      ) : (
+                        <Button
+                          size="sm" variant="ghost"
+                          className="flex-1 h-8 text-xs text-muted-foreground hover:text-destructive"
+                          onClick={() => handleDeactivate(f)}
+                        >
+                          Hapus
                         </Button>
                       )}
                     </div>
