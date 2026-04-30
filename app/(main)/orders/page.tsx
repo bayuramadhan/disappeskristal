@@ -59,6 +59,12 @@ export default function OrdersPage() {
   const [actionLoading, setActionLoading] = useState(false)
   const [priceHint, setPriceHint]         = useState<string | null>(null)
 
+  // Delivery log form
+  const [deliveryOpen, setDeliveryOpen]   = useState(false)
+  const [deliveryTarget, setDeliveryTarget] = useState<any>(null)
+  const [deliveryForm, setDeliveryForm]   = useState({ vehicleId: '', driverId: '', deliveredQty: '', returnedQty: '0', returnReason: '' })
+  const [deliveryLoading, setDeliveryLoading] = useState(false)
+
   const { canWrite, isAdmin } = useRole()
   const { data, isLoading } = useOrders({ ...filters, limit: 20 })
   const { data: customers }  = useCustomers({ limit: 200 } as any)
@@ -150,6 +156,44 @@ export default function OrdersPage() {
       toast({ title: `Pesanan ${status === 'CONFIRMED' ? 'dikonfirmasi' : 'dibatalkan'}` })
     } finally {
       setActionLoading(false)
+    }
+  }
+
+  // ── Armada aktif hari ini (untuk form delivery log) ──────────────────────
+  const { data: activeFleet } = useSWR(
+    deliveryOpen ? `/api/fleet?date=${filters.date}` : null,
+    fetcher,
+  )
+
+  // ── Submit delivery log ───────────────────────────────────────────────────
+  async function submitDeliveryLog(e: React.FormEvent) {
+    e.preventDefault()
+    if (!deliveryTarget) return
+    setDeliveryLoading(true)
+    try {
+      const res = await fetch('/api/delivery-logs', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId:      deliveryTarget.id,
+          vehicleId:    deliveryForm.vehicleId,
+          driverId:     deliveryForm.driverId,
+          deliveredQty: Number(deliveryForm.deliveredQty),
+          returnedQty:  Number(deliveryForm.returnedQty),
+          returnReason: deliveryForm.returnReason || undefined,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        toast({ title: 'Gagal mencatat pengiriman', description: json.message, variant: 'destructive' })
+        return
+      }
+      setDeliveryOpen(false)
+      globalMutate(key => typeof key === 'string' && key.startsWith('/api/orders'))
+      selectedOrderDetail.mutate()
+      toast({ title: 'Pengiriman tercatat', description: `Status diperbarui ke ${json.data?.orderStatusUpdatedTo ?? ''}` })
+    } finally {
+      setDeliveryLoading(false)
     }
   }
 
@@ -369,6 +413,79 @@ export default function OrdersPage() {
         </div>
       )}
 
+      {/* Dialog Catat Pengiriman */}
+      <Dialog open={deliveryOpen} onOpenChange={setDeliveryOpen}>
+        <DialogContent className="max-w-sm">
+          <DialogHeader>
+            <DialogTitle>Catat Pengiriman</DialogTitle>
+            <p className="text-sm text-muted-foreground">{deliveryTarget?.customer?.name} — {deliveryTarget?.orderedQty} sak dipesan</p>
+          </DialogHeader>
+          <form onSubmit={submitDeliveryLog} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Armada <span className="text-destructive">*</span></Label>
+              <Select value={deliveryForm.vehicleId} onValueChange={v => {
+                const fleet = (activeFleet ?? []).find((f: any) => f.vehicleId === v)
+                setDeliveryForm(f => ({ ...f, vehicleId: v, driverId: fleet?.driverId ?? '' }))
+              }}>
+                <SelectTrigger><SelectValue placeholder="Pilih kendaraan aktif..." /></SelectTrigger>
+                <SelectContent>
+                  {(activeFleet ?? []).map((f: any) => (
+                    <SelectItem key={f.vehicleId} value={f.vehicleId}>
+                      {f.vehicle?.plateNumber} — {f.driver?.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {(activeFleet ?? []).length === 0 && (
+                <p className="text-xs text-amber-600">Tidak ada armada aktif hari ini</p>
+              )}
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>Terkirim (sak) <span className="text-destructive">*</span></Label>
+                <Input
+                  type="number" min={0} max={deliveryTarget?.orderedQty}
+                  value={deliveryForm.deliveredQty}
+                  onChange={e => setDeliveryForm(f => ({ ...f, deliveredQty: e.target.value }))}
+                  placeholder="0" required
+                />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Retur (sak)</Label>
+                <Input
+                  type="number" min={0}
+                  value={deliveryForm.returnedQty}
+                  onChange={e => setDeliveryForm(f => ({ ...f, returnedQty: e.target.value }))}
+                  placeholder="0"
+                />
+              </div>
+            </div>
+            {Number(deliveryForm.returnedQty) > 0 && (
+              <div className="space-y-1.5">
+                <Label>Alasan Retur <span className="text-muted-foreground text-xs">(opsional)</span></Label>
+                <Select value={deliveryForm.returnReason} onValueChange={v => setDeliveryForm(f => ({ ...f, returnReason: v }))}>
+                  <SelectTrigger><SelectValue placeholder="Pilih alasan..." /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="WEATHER">Cuaca</SelectItem>
+                    <SelectItem value="CUSTOMER_CLOSED">Pelanggan tutup</SelectItem>
+                    <SelectItem value="ALREADY_BOUGHT">Sudah beli di tempat lain</SelectItem>
+                    <SelectItem value="LATE_DELIVERY">Pengiriman terlambat</SelectItem>
+                    <SelectItem value="REDUCED_NEED">Kebutuhan berkurang</SelectItem>
+                    <SelectItem value="OTHER">Lainnya</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setDeliveryOpen(false)}>Batal</Button>
+              <Button type="submit" disabled={deliveryLoading || !deliveryForm.vehicleId || deliveryForm.deliveredQty === ''}>
+                {deliveryLoading ? 'Menyimpan...' : 'Simpan'}
+              </Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
+
       {/* Detail Sheet */}
       <Sheet open={!!selectedOrder} onOpenChange={open => !open && setSelectedOrder(null)}>
         <SheetContent className="w-full sm:max-w-lg overflow-y-auto">
@@ -439,7 +556,26 @@ export default function OrdersPage() {
                       const isFinal = finalStatuses.includes(o.status)
                       if (isFinal) return null
                       return (
-                        <div className="border-t pt-4 flex gap-2">
+                        <div className="border-t pt-4 space-y-2">
+                          {['CONFIRMED', 'ASSIGNED', 'LOADED'].includes(o.status) && canWrite && (
+                            <Button
+                              size="sm" className="w-full"
+                              onClick={() => {
+                                setDeliveryTarget(o)
+                                setDeliveryForm({
+                                  vehicleId: o.vehicleId ?? '',
+                                  driverId: '',
+                                  deliveredQty: String(o.orderedQty),
+                                  returnedQty: '0',
+                                  returnReason: '',
+                                })
+                                setDeliveryOpen(true)
+                              }}
+                            >
+                              Catat Pengiriman
+                            </Button>
+                          )}
+                          <div className="flex gap-2">
                           {o.status === 'CREATED' && canWrite && (
                             <Button
                               size="sm" className="flex-1"
@@ -462,6 +598,7 @@ export default function OrdersPage() {
                               Batalkan
                             </Button>
                           )}
+                          </div>
                         </div>
                       )
                     })()}
