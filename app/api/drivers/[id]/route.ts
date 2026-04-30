@@ -70,3 +70,31 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return apiServerError(err)
   }
 }
+
+// ─── DELETE /api/drivers/[id] ─────────────────────────────────────────────────
+export async function DELETE(_req: NextRequest, { params }: Params) {
+  const { user, error } = await requireAuth()
+  if (error) return error
+  if (user.role !== 'ADMIN') return apiError('Akses ditolak', 403)
+
+  try {
+    const existing = await prisma.driver.findFirst({
+      where: { id: params.id, deletedAt: null },
+      include: { _count: { select: { fleetDailyStatus: true, deliveryLogs: true } } },
+    })
+    if (!existing) return apiNotFound('Driver')
+
+    if (existing._count.fleetDailyStatus > 0 || existing._count.deliveryLogs > 0) {
+      return apiError('Driver tidak dapat dihapus karena sudah memiliki data operasional', 409)
+    }
+
+    await prisma.driver.update({
+      where: { id: params.id },
+      data: { deletedAt: new Date() },
+    })
+
+    return apiSuccess(null, 'Driver berhasil dihapus')
+  } catch (err) {
+    return apiServerError(err)
+  }
+}

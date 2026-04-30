@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Search, Plus, Pencil, ChevronRight } from 'lucide-react'
+import { Search, Plus, Pencil, Trash2, ChevronRight } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -34,6 +34,14 @@ export default function DriversPage() {
   const { isAdmin } = useRole()
   const router = useRouter()
   const key = `/api/drivers${search ? `?search=${encodeURIComponent(search)}` : ''}`
+
+  async function handleDelete(id: string, name: string) {
+    if (!confirm(`Hapus driver ${name}?`)) return
+    const res = await fetch(`/api/drivers/${id}`, { method: 'DELETE' })
+    const json = await res.json()
+    if (!res.ok) { alert(json.message ?? 'Gagal menghapus'); return }
+    mutate(key)
+  }
   const { data: drivers, isLoading } = useSWR(key)
   const { data: vehicles } = useSWR('/api/vehicles')
 
@@ -164,9 +172,14 @@ export default function DriversPage() {
                     <TableCell onClick={e => e.stopPropagation()}>
                       <div className="flex items-center gap-1">
                         {isAdmin && (
-                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(d)}>
-                            <Pencil className="h-3.5 w-3.5" />
-                          </Button>
+                          <>
+                            <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(d)}>
+                              <Pencil className="h-3.5 w-3.5" />
+                            </Button>
+                            <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDelete(d.id, d.name)}>
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </Button>
+                          </>
                         )}
                         <ChevronRight className="h-4 w-4 text-muted-foreground" />
                       </div>
