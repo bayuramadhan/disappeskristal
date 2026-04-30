@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { format } from 'date-fns'
-import { Plus, Truck, User, Package, MapPin, Clock, ChevronDown, Trash2 } from 'lucide-react'
+import { Plus, Truck, User, Package, Clock, ChevronDown } from 'lucide-react'
 import { useFleet, useVehicles, useDrivers } from '@/hooks/useFleet'
 import { useRayons } from '@/hooks/useCustomers'
 import { PageHeader } from '@/components/shared/PageHeader'
@@ -307,16 +307,18 @@ export default function FleetPage() {
                   {canWrite && (
                     <div className="flex gap-2 pt-1 border-t">
                       <Button size="sm" variant="outline" className="flex-1 h-8 text-xs" onClick={() => openUpdate(f)}>
-                        <ChevronDown className="h-3.5 w-3.5 mr-1" /> Perbarui
+                        <Clock className="h-3.5 w-3.5 mr-1" /> Edit Waktu Berangkat
                       </Button>
-                      <Button
-                        size="sm"
-                        variant="ghost"
-                        className="h-8 w-8 p-0 text-destructive hover:text-destructive"
-                        onClick={() => handleDeactivate(f)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                      {f.activeStatus && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="flex-1 h-8 text-xs text-destructive border-destructive hover:bg-destructive hover:text-white"
+                          onClick={() => handleDeactivate(f)}
+                        >
+                          Selesai Hari Ini
+                        </Button>
+                      )}
                     </div>
                   )}
                 </CardContent>
