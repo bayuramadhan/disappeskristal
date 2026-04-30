@@ -417,8 +417,13 @@ export default function OrdersPage() {
       <Dialog open={deliveryOpen} onOpenChange={setDeliveryOpen}>
         <DialogContent className="max-w-sm">
           <DialogHeader>
-            <DialogTitle>Catat Pengiriman</DialogTitle>
-            <p className="text-sm text-muted-foreground">{deliveryTarget?.customer?.name} — {deliveryTarget?.orderedQty} sak dipesan</p>
+            <DialogTitle>{deliveryTarget?.status === 'PARTIAL' ? 'Catat Pengiriman Lanjutan' : 'Catat Pengiriman'}</DialogTitle>
+            <p className="text-sm text-muted-foreground">
+              {deliveryTarget?.customer?.name} — {deliveryTarget?.orderedQty} sak dipesan
+              {deliveryTarget?.status === 'PARTIAL' && (
+                <span className="text-amber-600 ml-1">(sisa {deliveryTarget.orderedQty - (deliveryTarget.deliveredQty ?? 0)} sak belum terkirim)</span>
+              )}
+            </p>
           </DialogHeader>
           <form onSubmit={submitDeliveryLog} className="space-y-4">
             <div className="space-y-1.5">
@@ -573,27 +578,28 @@ export default function OrdersPage() {
 
                     {/* Aksi */}
                     {(() => {
-                      const finalStatuses = ['DELIVERED', 'PARTIAL', 'RETURNED', 'CANCELLED', 'REJECTED']
+                      const finalStatuses = ['DELIVERED', 'RETURNED', 'CANCELLED', 'REJECTED']
                       const isFinal = finalStatuses.includes(o.status)
                       if (isFinal) return null
                       return (
                         <div className="border-t pt-4 space-y-2">
-                          {['CONFIRMED', 'ASSIGNED', 'LOADED'].includes(o.status) && canWrite && (
+                          {['CONFIRMED', 'ASSIGNED', 'LOADED', 'PARTIAL'].includes(o.status) && canWrite && (
                             <Button
                               size="sm" className="w-full"
                               onClick={() => {
+                                const sisaQty = o.orderedQty - (o.deliveredQty ?? 0)
                                 setDeliveryTarget(o)
                                 setDeliveryForm({
                                   vehicleId: o.vehicleId ?? '',
                                   driverId: '',
-                                  deliveredQty: String(o.orderedQty),
+                                  deliveredQty: String(sisaQty > 0 ? sisaQty : o.orderedQty),
                                   returnedQty: '0',
                                   returnReason: '',
                                 })
                                 setDeliveryOpen(true)
                               }}
                             >
-                              Catat Pengiriman
+                              {o.status === 'PARTIAL' ? 'Catat Pengiriman Lanjutan' : 'Catat Pengiriman'}
                             </Button>
                           )}
                           <div className="flex gap-2">
