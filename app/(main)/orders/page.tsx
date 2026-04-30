@@ -27,7 +27,7 @@ import useSWR, { mutate as globalMutate } from 'swr'
 import { fetcher } from '@/lib/fetcher'
 
 const STATUS_OPTIONS  = ['CREATED', 'CONFIRMED', 'LOADED', 'DELIVERED', 'PARTIAL', 'RETURNED', 'CANCELLED']
-const CHANNEL_OPTIONS = ['PREORDER', 'HOTLINE', 'CANVAS', 'ADMIN_INPUT']
+const CHANNEL_OPTIONS = ['PREORDER', 'HOTLINE', 'CANVAS']
 const CHANNEL_LABELS: Record<string, string> = {
   PREORDER:    'Pre-order',
   HOTLINE:     'Hotline',
