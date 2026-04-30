@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import { Plus, Search, X, Download } from 'lucide-react'
 import Papa from 'papaparse'
@@ -57,10 +57,47 @@ export default function OrdersPage() {
   })
   const [submitting, setSubmitting]       = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
+  const [priceHint, setPriceHint]         = useState<string | null>(null)
 
   const { canWrite, isAdmin } = useRole()
   const { data, isLoading } = useOrders({ ...filters, limit: 20 })
   const { data: customers }  = useCustomers({ limit: 200 } as any)
+
+  // Auto-lookup harga dari PriceProfile
+  useEffect(() => {
+    const { customerId, orderChannel, deliveryDate } = newOrderForm
+    if (!customerId || !orderChannel || !deliveryDate) { setPriceHint(null); return }
+
+    const customer = (customers ?? []).find((c: any) => c.id === customerId)
+    if (!customer) { setPriceHint(null); return }
+
+    const params = new URLSearchParams({ customerType: customer.customerType, channel: orderChannel })
+    if (customer.rayonId) params.set('rayonId', customer.rayonId)
+
+    fetch(`/api/price-profiles?${params}`)
+      .then(r => r.json())
+      .then(json => {
+        const profiles: any[] = json.data ?? []
+        const date = new Date(deliveryDate)
+
+        // Filter yang berlaku di tanggal pengiriman
+        const valid = profiles.filter(p =>
+          new Date(p.validFrom) <= date && date <= new Date(p.validUntil)
+        )
+
+        // Prefer rayon spesifik, fallback ke null (semua rayon)
+        const match = valid.find(p => p.rayonId === customer.rayonId)
+          ?? valid.find(p => p.rayonId === null)
+
+        if (match) {
+          setNewOrderForm(f => ({ ...f, pricePerUnit: String(match.price) }))
+          setPriceHint(`Dari harga jual: Rp ${match.price.toLocaleString('id-ID')}/sak`)
+        } else {
+          setPriceHint('Tidak ada harga terdaftar untuk kombinasi ini')
+        }
+      })
+      .catch(() => setPriceHint(null))
+  }, [newOrderForm.customerId, newOrderForm.orderChannel, newOrderForm.deliveryDate, customers])
   const selectedOrderDetail  = useSWR(selectedOrder ? `/api/orders/${selectedOrder.id}` : null, fetcher)
 
   const setFilter = (key: string, value: string) =>
@@ -84,6 +121,7 @@ export default function OrdersPage() {
         setNewOrderOpen(false)
         globalMutate(key => typeof key === 'string' && key.startsWith('/api/orders'))
         setNewOrderForm({ customerId: '', orderChannel: 'PREORDER', deliveryDate: today, orderedQty: '', pricePerUnit: '', notes: '' })
+        setPriceHint(null)
         toast({ title: 'Pesanan berhasil dibuat', variant: 'success' })
       } else {
         const err = await res.json().catch(() => ({}))
@@ -207,7 +245,12 @@ export default function OrdersPage() {
                       </div>
                       <div className="space-y-1.5">
                         <Label>Harga/sak (Rp)</Label>
-                        <Input type="number" min={0} value={newOrderForm.pricePerUnit} onChange={e => setNewOrderForm(f => ({ ...f, pricePerUnit: e.target.value }))} required />
+                        <Input type="number" min={0} value={newOrderForm.pricePerUnit} onChange={e => { setNewOrderForm(f => ({ ...f, pricePerUnit: e.target.value })); setPriceHint(null) }} required />
+                        {priceHint && (
+                          <p className={`text-xs ${priceHint.startsWith('Tidak') ? 'text-amber-600' : 'text-emerald-600'}`}>
+                            {priceHint}
+                          </p>
+                        )}
                       </div>
                     </div>
                     <div className="space-y-1.5">
