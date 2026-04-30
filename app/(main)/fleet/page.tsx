@@ -87,7 +87,6 @@ export default function FleetPage() {
     setUpdating(true)
     try {
       const body: Record<string, any> = {}
-      if (updateForm.remainingLoad !== '') body.remainingLoad = Number(updateForm.remainingLoad)
       if (updateForm.departureTime) body.departureTime = updateForm.departureTime
 
       const res = await fetch(`/api/fleet/${updateTarget.id}`, {
@@ -217,25 +216,14 @@ export default function FleetPage() {
             <DialogTitle>Perbarui Armada — {updateTarget?.vehicle?.plateNumber}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleUpdate} className="space-y-4">
+            <p className="text-sm text-muted-foreground">Sisa muatan diperbarui otomatis saat pengiriman dicatat.</p>
             <div className="space-y-1.5">
-              <Label>Waktu Berangkat <span className="text-muted-foreground text-xs">(opsional)</span></Label>
+              <Label>Waktu Berangkat</Label>
               <Input
                 type="datetime-local"
                 value={updateForm.departureTime}
                 onChange={e => setUpdateForm(f => ({ ...f, departureTime: e.target.value }))}
               />
-            </div>
-            <div className="space-y-1.5">
-              <Label>Sisa Muatan (sak)</Label>
-              <Input
-                type="number"
-                min={0}
-                max={updateTarget?.initialLoad}
-                value={updateForm.remainingLoad}
-                onChange={e => setUpdateForm(f => ({ ...f, remainingLoad: e.target.value }))}
-                required
-              />
-              <p className="text-xs text-muted-foreground">Muatan awal: {updateTarget?.initialLoad} sak</p>
             </div>
             <DialogFooter>
               <Button type="button" variant="outline" onClick={() => setUpdateOpen(false)}>Batal</Button>

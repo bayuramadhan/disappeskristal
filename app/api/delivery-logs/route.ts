@@ -106,7 +106,16 @@ export async function POST(req: NextRequest) {
     // Determine new order status
     const newOrderStatus = deriveOrderStatus(order.orderedQty, deliveredQty, returnedQty ?? 0)
 
-    // Run in transaction: create log + update order
+    // Find active fleet entry for this vehicle on delivery date
+    const deliveryDate = new Date(order.deliveryDate)
+    const fleet = await prisma.fleetDailyStatus.findFirst({
+      where: { vehicleId, date: deliveryDate, deletedAt: null },
+    })
+
+    // Net qty leaving the vehicle = delivered - returned (returned comes back)
+    const netOut = deliveredQty - (returnedQty ?? 0)
+
+    // Run in transaction: create log + update order + update fleet remaining load
     const [log] = await prisma.$transaction([
       prisma.deliveryLog.create({
         data: {
@@ -127,6 +136,14 @@ export async function POST(req: NextRequest) {
           status:       newOrderStatus as any,
         },
       }),
+      ...(fleet ? [
+        prisma.fleetDailyStatus.update({
+          where: { id: fleet.id },
+          data: {
+            remainingLoad: { decrement: netOut < 0 ? 0 : netOut },
+          },
+        }),
+      ] : []),
     ])
 
     const fullLog = await prisma.deliveryLog.findUnique({
