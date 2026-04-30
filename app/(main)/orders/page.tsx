@@ -28,6 +28,23 @@ import { fetcher } from '@/lib/fetcher'
 
 const STATUS_OPTIONS  = ['CREATED', 'CONFIRMED', 'LOADED', 'DELIVERED', 'PARTIAL', 'RETURNED', 'CANCELLED']
 const CHANNEL_OPTIONS = ['PREORDER', 'HOTLINE', 'CANVAS', 'ADMIN_INPUT']
+const CHANNEL_LABELS: Record<string, string> = {
+  PREORDER:    'Pre-order',
+  HOTLINE:     'Hotline',
+  CANVAS:      'Canvas',
+  ADMIN_INPUT: 'Admin Input',
+}
+const STATUS_LABELS: Record<string, string> = {
+  CREATED:   'Dibuat',
+  CONFIRMED: 'Dikonfirmasi',
+  ASSIGNED:  'Ditugaskan',
+  LOADED:    'Dimuat',
+  DELIVERED: 'Terkirim',
+  PARTIAL:   'Sebagian',
+  RETURNED:  'Dikembalikan',
+  CANCELLED: 'Dibatalkan',
+  REJECTED:  'Ditolak',
+}
 
 export default function OrdersPage() {
   const today = format(new Date(), 'yyyy-MM-dd')
@@ -174,7 +191,7 @@ export default function OrdersPage() {
                         <Select value={newOrderForm.orderChannel} onValueChange={v => setNewOrderForm(f => ({ ...f, orderChannel: v }))}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
-                            {CHANNEL_OPTIONS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                            {CHANNEL_OPTIONS.map(c => <SelectItem key={c} value={c}>{CHANNEL_LABELS[c] ?? c}</SelectItem>)}
                           </SelectContent>
                         </Select>
                       </div>
@@ -223,7 +240,7 @@ export default function OrdersPage() {
                 <SelectTrigger className="w-36 h-8 text-sm"><SelectValue placeholder="Semua" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Semua</SelectItem>
-                  {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                  {STATUS_OPTIONS.map(s => <SelectItem key={s} value={s}>{STATUS_LABELS[s] ?? s}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
@@ -233,7 +250,7 @@ export default function OrdersPage() {
                 <SelectTrigger className="w-36 h-8 text-sm"><SelectValue placeholder="Semua" /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Semua</SelectItem>
-                  {CHANNEL_OPTIONS.map(c => <SelectItem key={c} value={c}>{c}</SelectItem>)}
+                  {CHANNEL_OPTIONS.map(c => <SelectItem key={c} value={c}>{CHANNEL_LABELS[c] ?? c}</SelectItem>)}
                 </SelectContent>
               </Select>
             </div>
