@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { Search, Plus, Pencil } from 'lucide-react'
+import { Search, Plus, Pencil, ChevronRight } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 import useSWR, { mutate } from 'swr'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingState } from '@/components/shared/LoadingState'
@@ -31,6 +32,7 @@ export default function DriversPage() {
   const [error, setError] = useState('')
 
   const { isAdmin } = useRole()
+  const router = useRouter()
   const key = `/api/drivers${search ? `?search=${encodeURIComponent(search)}` : ''}`
   const { data: drivers, isLoading } = useSWR(key)
   const { data: vehicles } = useSWR('/api/vehicles')
@@ -152,20 +154,23 @@ export default function DriversPage() {
               </TableHeader>
               <TableBody>
                 {(drivers ?? []).map((d: any) => (
-                  <TableRow key={d.id}>
+                  <TableRow key={d.id} className="cursor-pointer" onClick={() => router.push(`/master/drivers/${d.id}`)}>
                     <TableCell className="font-medium">{d.name}</TableCell>
                     <TableCell className="text-sm">{d.phone ?? '-'}</TableCell>
                     <TableCell className="text-sm text-muted-foreground">{d.assignedVehicle?.plateNumber ?? '-'}</TableCell>
                     <TableCell>
                       <Badge variant={STATUS_VARIANTS[d.status] ?? 'secondary'}>{STATUS_LABELS[d.status] ?? d.status}</Badge>
                     </TableCell>
-                    {isAdmin && (
-                      <TableCell>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(d)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
-                      </TableCell>
-                    )}
+                    <TableCell onClick={e => e.stopPropagation()}>
+                      <div className="flex items-center gap-1">
+                        {isAdmin && (
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(d)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                      </div>
+                    </TableCell>
                   </TableRow>
                 ))}
               </TableBody>
