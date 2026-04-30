@@ -15,7 +15,7 @@ import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useRole } from '@/hooks/useRole'
 
-const emptyForm = { name: '', coverageArea: '' }
+const emptyForm = { name: '', coverageArea: '', activeStatus: true }
 
 export default function RayonsPage() {
   const [search, setSearch] = useState('')
@@ -38,7 +38,7 @@ export default function RayonsPage() {
 
   function openEdit(r: any) {
     setEditId(r.id)
-    setForm({ name: r.name, coverageArea: r.coverageArea ?? '' })
+    setForm({ name: r.name, coverageArea: r.coverageArea ?? '', activeStatus: r.activeStatus })
     setError('')
     setOpen(true)
   }
@@ -85,6 +85,16 @@ export default function RayonsPage() {
             <div className="space-y-1.5">
               <Label>Area Cakupan</Label>
               <Input value={form.coverageArea} onChange={e => setForm(f => ({ ...f, coverageArea: e.target.value }))} placeholder="Kota Utara & Sekitar" />
+            </div>
+            <div className="flex items-center gap-2">
+              <input
+                type="checkbox"
+                id="activeStatus"
+                checked={form.activeStatus}
+                onChange={e => setForm(f => ({ ...f, activeStatus: e.target.checked }))}
+                className="h-4 w-4 rounded border-gray-300"
+              />
+              <Label htmlFor="activeStatus">Rayon aktif</Label>
             </div>
             {error && <p className="text-sm text-destructive">{error}</p>}
             <DialogFooter>

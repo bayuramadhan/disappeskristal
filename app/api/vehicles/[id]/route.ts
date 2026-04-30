@@ -71,3 +71,31 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     return apiServerError(err)
   }
 }
+
+// ─── DELETE /api/vehicles/[id] ────────────────────────────────────────────────
+export async function DELETE(_req: NextRequest, { params }: Params) {
+  const { user, error } = await requireAuth()
+  if (error) return error
+  if (user.role !== 'ADMIN') return apiError('Akses ditolak', 403)
+
+  try {
+    const existing = await prisma.vehicle.findFirst({
+      where: { id: params.id, deletedAt: null },
+      include: { _count: { select: { fleetDailyStatus: true, orders: true } } },
+    })
+    if (!existing) return apiNotFound('Kendaraan')
+
+    if (existing._count.fleetDailyStatus > 0 || existing._count.orders > 0) {
+      return apiError('Kendaraan tidak dapat dihapus karena sudah memiliki data operasional', 409)
+    }
+
+    await prisma.vehicle.update({
+      where: { id: params.id },
+      data: { deletedAt: new Date() },
+    })
+
+    return apiSuccess(null, 'Kendaraan berhasil dihapus')
+  } catch (err) {
+    return apiServerError(err)
+  }
+}

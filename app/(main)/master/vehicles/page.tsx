@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Search, Plus, Pencil, Truck } from 'lucide-react'
+import { Search, Plus, Pencil, Trash2 } from 'lucide-react'
 import useSWR, { mutate } from 'swr'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingState } from '@/components/shared/LoadingState'
@@ -33,6 +33,14 @@ export default function VehiclesPage() {
   const { isAdmin } = useRole()
   const key = `/api/vehicles${search ? `?search=${encodeURIComponent(search)}` : ''}`
   const { data: vehicles, isLoading } = useSWR(key)
+
+  async function handleDelete(id: string, plateNumber: string) {
+    if (!confirm(`Hapus kendaraan ${plateNumber}?`)) return
+    const res = await fetch(`/api/vehicles/${id}`, { method: 'DELETE' })
+    const json = await res.json()
+    if (!res.ok) { alert(json.message ?? 'Gagal menghapus'); return }
+    mutate(key)
+  }
 
   function openCreate() {
     setEditId(null)
@@ -154,9 +162,14 @@ export default function VehiclesPage() {
                     </TableCell>
                     {isAdmin && (
                       <TableCell>
-                        <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(v)}>
-                          <Pencil className="h-3.5 w-3.5" />
-                        </Button>
+                        <div className="flex gap-1">
+                          <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEdit(v)}>
+                            <Pencil className="h-3.5 w-3.5" />
+                          </Button>
+                          <Button variant="ghost" size="icon" className="h-8 w-8 text-destructive hover:text-destructive" onClick={() => handleDelete(v.id, v.plateNumber)}>
+                            <Trash2 className="h-3.5 w-3.5" />
+                          </Button>
+                        </div>
                       </TableCell>
                     )}
                   </TableRow>
