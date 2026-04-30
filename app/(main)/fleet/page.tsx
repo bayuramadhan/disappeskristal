@@ -87,7 +87,7 @@ export default function FleetPage() {
     setUpdating(true)
     try {
       const body: Record<string, any> = {}
-      if (updateForm.departureTime) body.departureTime = updateForm.departureTime
+      if (updateForm.departureTime) body.departureTime = new Date(updateForm.departureTime).toISOString()
 
       const res = await fetch(`/api/fleet/${updateTarget.id}`, {
         method: 'PATCH',
