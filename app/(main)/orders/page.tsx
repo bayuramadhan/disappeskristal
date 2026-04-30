@@ -212,7 +212,7 @@ export default function OrdersPage() {
                   </DialogHeader>
                   <form onSubmit={submitNewOrder} className="space-y-4">
                     <div className="space-y-1.5">
-                      <Label>Pelanggan</Label>
+                      <Label>Pelanggan <span className="text-destructive">*</span></Label>
                       <Select value={newOrderForm.customerId} onValueChange={v => setNewOrderForm(f => ({ ...f, customerId: v }))}>
                         <SelectTrigger><SelectValue placeholder="Pilih pelanggan..." /></SelectTrigger>
                         <SelectContent>
@@ -224,7 +224,7 @@ export default function OrdersPage() {
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
-                        <Label>Channel</Label>
+                        <Label>Channel <span className="text-destructive">*</span></Label>
                         <Select value={newOrderForm.orderChannel} onValueChange={v => setNewOrderForm(f => ({ ...f, orderChannel: v }))}>
                           <SelectTrigger><SelectValue /></SelectTrigger>
                           <SelectContent>
@@ -233,17 +233,17 @@ export default function OrdersPage() {
                         </Select>
                       </div>
                       <div className="space-y-1.5">
-                        <Label>Tanggal Kirim</Label>
+                        <Label>Tanggal Kirim <span className="text-destructive">*</span></Label>
                         <Input type="date" value={newOrderForm.deliveryDate} onChange={e => setNewOrderForm(f => ({ ...f, deliveryDate: e.target.value }))} />
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
-                        <Label>Qty (sak)</Label>
+                        <Label>Qty (sak) <span className="text-destructive">*</span></Label>
                         <Input type="number" min={1} value={newOrderForm.orderedQty} onChange={e => setNewOrderForm(f => ({ ...f, orderedQty: e.target.value }))} required />
                       </div>
                       <div className="space-y-1.5">
-                        <Label>Harga/sak (Rp)</Label>
+                        <Label>Harga/sak (Rp) <span className="text-destructive">*</span></Label>
                         <Input type="number" min={0} value={newOrderForm.pricePerUnit} onChange={e => { setNewOrderForm(f => ({ ...f, pricePerUnit: e.target.value })); setPriceHint(null) }} required />
                         {priceHint && (
                           <p className={`text-xs ${priceHint.startsWith('Tidak') ? 'text-amber-600' : 'text-emerald-600'}`}>
@@ -253,7 +253,7 @@ export default function OrdersPage() {
                       </div>
                     </div>
                     <div className="space-y-1.5">
-                      <Label>Catatan</Label>
+                      <Label>Catatan <span className="text-muted-foreground text-xs">(opsional)</span></Label>
                       <Textarea value={newOrderForm.notes} onChange={e => setNewOrderForm(f => ({ ...f, notes: e.target.value }))} placeholder="Opsional..." rows={2} />
                     </div>
                     <DialogFooter>
