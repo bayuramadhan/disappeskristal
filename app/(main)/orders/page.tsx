@@ -38,9 +38,10 @@ export default function OrdersPage() {
     customerId: '', orderChannel: 'PREORDER', deliveryDate: today,
     orderedQty: '', pricePerUnit: '', notes: '',
   })
-  const [submitting, setSubmitting] = useState(false)
+  const [submitting, setSubmitting]       = useState(false)
+  const [actionLoading, setActionLoading] = useState(false)
 
-  const { canWrite } = useRole()
+  const { canWrite, isAdmin } = useRole()
   const { data, isLoading } = useOrders({ ...filters, limit: 20 })
   const { data: customers }  = useCustomers({ limit: 200 } as any)
   const selectedOrderDetail  = useSWR(selectedOrder ? `/api/orders/${selectedOrder.id}` : null, fetcher)
@@ -73,6 +74,28 @@ export default function OrdersPage() {
       }
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  // ── Update order status ───────────────────────────────────────────────────
+  async function updateOrderStatus(id: string, status: string) {
+    setActionLoading(true)
+    try {
+      const res  = await fetch(`/api/orders/${id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status }),
+      })
+      const json = await res.json()
+      if (!res.ok) {
+        toast({ title: 'Gagal mengubah status', description: json.message, variant: 'destructive' })
+        return
+      }
+      globalMutate(key => typeof key === 'string' && key.startsWith('/api/orders'))
+      selectedOrderDetail.mutate()
+      toast({ title: `Pesanan ${status === 'CONFIRMED' ? 'dikonfirmasi' : 'dibatalkan'}` })
+    } finally {
+      setActionLoading(false)
     }
   }
 
@@ -344,6 +367,37 @@ export default function OrdersPage() {
                         </div>
                       </div>
                     )}
+
+                    {/* Aksi */}
+                    {(() => {
+                      const finalStatuses = ['DELIVERED', 'PARTIAL', 'RETURNED', 'CANCELLED', 'REJECTED']
+                      const isFinal = finalStatuses.includes(o.status)
+                      if (isFinal) return null
+                      return (
+                        <div className="border-t pt-4 flex gap-2">
+                          {o.status === 'CREATED' && canWrite && (
+                            <Button
+                              size="sm" className="flex-1"
+                              disabled={actionLoading}
+                              onClick={() => updateOrderStatus(o.id, 'CONFIRMED')}
+                            >
+                              Konfirmasi
+                            </Button>
+                          )}
+                          {canWrite && (
+                            <Button
+                              size="sm" variant="outline" className="flex-1 text-destructive border-destructive hover:bg-destructive hover:text-white"
+                              disabled={actionLoading}
+                              onClick={() => {
+                                if (confirm('Batalkan pesanan ini?')) updateOrderStatus(o.id, 'CANCELLED')
+                              }}
+                            >
+                              Batalkan
+                            </Button>
+                          )}
+                        </div>
+                      )
+                    })()}
                   </>
                 )
               })()}
