@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
-import { Plus, Search, X, Download } from 'lucide-react'
+import { Plus, Search, X, Download, MessageSquare, Loader2 } from 'lucide-react'
 import Papa from 'papaparse'
 import { useOrders } from '@/hooks/useOrders'
 import { useCustomers } from '@/hooks/useCustomers'
@@ -58,6 +58,18 @@ export default function OrdersPage() {
   const [submitting, setSubmitting]       = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
   const [priceHint, setPriceHint]         = useState<string | null>(null)
+
+  // WA import
+  const [waOpen, setWaOpen]       = useState(false)
+  const [waStep, setWaStep]       = useState<'paste' | 'review'>('paste')
+  const [waMessage, setWaMessage] = useState('')
+  const [waParsing, setWaParsing] = useState(false)
+  const [waParseErr, setWaParseErr] = useState('')
+  const [waForm, setWaForm]       = useState({
+    customerId: '', customerNameHint: '', orderedQty: '',
+    deliveryDate: today, pricePerUnit: '', notes: '',
+  })
+  const [waSubmitting, setWaSubmitting] = useState(false)
 
   // Delivery log form
   const [deliveryOpen, setDeliveryOpen]   = useState(false)
@@ -197,6 +209,71 @@ export default function OrdersPage() {
     }
   }
 
+  // ── WA parse & submit ─────────────────────────────────────────────────────
+  async function parseWA() {
+    if (!waMessage.trim()) return
+    setWaParsing(true)
+    setWaParseErr('')
+    try {
+      const res  = await fetch('/api/orders/parse-wa', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: waMessage }),
+      })
+      const json = await res.json()
+      if (!res.ok) { setWaParseErr(json.message ?? 'Gagal memparse'); return }
+      const d = json.data
+      // Try to find customer by name
+      const hint = d.customerName ?? ''
+      const matched = (customers ?? []).find((c: any) =>
+        c.name.toLowerCase().includes(hint.toLowerCase()) ||
+        (d.customerPhone && c.phone?.includes(d.customerPhone))
+      )
+      setWaForm({
+        customerId:       matched?.id ?? '',
+        customerNameHint: hint,
+        orderedQty:       d.orderedQty != null ? String(d.orderedQty) : '',
+        deliveryDate:     d.deliveryDate ?? today,
+        pricePerUnit:     '',
+        notes:            d.notes ?? '',
+      })
+      setWaStep('review')
+    } finally {
+      setWaParsing(false)
+    }
+  }
+
+  async function submitWAOrder(e: React.FormEvent) {
+    e.preventDefault()
+    setWaSubmitting(true)
+    try {
+      const res = await fetch('/api/orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          customerId:   waForm.customerId,
+          orderChannel: 'HOTLINE',
+          deliveryDate: waForm.deliveryDate,
+          orderedQty:   Number(waForm.orderedQty),
+          pricePerUnit: Number(waForm.pricePerUnit),
+          notes:        waForm.notes || undefined,
+        }),
+      })
+      if (res.ok) {
+        setWaOpen(false)
+        setWaStep('paste')
+        setWaMessage('')
+        globalMutate(key => typeof key === 'string' && key.startsWith('/api/orders'))
+        toast({ title: 'Pesanan WA berhasil dibuat', variant: 'success' })
+      } else {
+        const err = await res.json().catch(() => ({}))
+        toast({ title: 'Gagal membuat pesanan', description: err.message, variant: 'destructive' })
+      }
+    } finally {
+      setWaSubmitting(false)
+    }
+  }
+
   // ── CSV Export ────────────────────────────────────────────────────────────
   function exportCSV() {
     const orders = data?.orders ?? data ?? []
@@ -243,6 +320,81 @@ export default function OrdersPage() {
             <Button variant="outline" size="sm" className="gap-1.5" onClick={exportCSV}>
               <Download className="h-4 w-4" /> Export CSV
             </Button>
+            {canWrite && (
+              <Dialog open={waOpen} onOpenChange={v => { setWaOpen(v); if (!v) { setWaStep('paste'); setWaParseErr('') } }}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm" className="gap-1.5">
+                    <MessageSquare className="h-4 w-4" /> Import WA
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Import Pesanan dari WhatsApp</DialogTitle>
+                  </DialogHeader>
+
+                  {waStep === 'paste' ? (
+                    <div className="space-y-4">
+                      <p className="text-sm text-muted-foreground">Paste pesan WhatsApp dari pelanggan, AI akan mengekstrak detail pesanan secara otomatis.</p>
+                      <Textarea
+                        rows={6}
+                        placeholder={'Contoh:\n"Halo, ini Pak Budi dari Warung Segar. Pesan 10 sak es kristal untuk besok ya. Terima kasih"'}
+                        value={waMessage}
+                        onChange={e => setWaMessage(e.target.value)}
+                      />
+                      {waParseErr && <p className="text-sm text-destructive">{waParseErr}</p>}
+                      <DialogFooter>
+                        <Button variant="outline" onClick={() => setWaOpen(false)}>Batal</Button>
+                        <Button onClick={parseWA} disabled={waParsing || !waMessage.trim()} className="gap-1.5">
+                          {waParsing ? <><Loader2 className="h-4 w-4 animate-spin" /> Memproses...</> : 'Parse Pesan'}
+                        </Button>
+                      </DialogFooter>
+                    </div>
+                  ) : (
+                    <form onSubmit={submitWAOrder} className="space-y-4">
+                      <p className="text-sm text-muted-foreground">Periksa dan lengkapi detail pesanan sebelum menyimpan.</p>
+                      <div className="space-y-1.5">
+                        <Label>Pelanggan <span className="text-destructive">*</span></Label>
+                        {waForm.customerNameHint && (
+                          <p className="text-xs text-muted-foreground">Dari pesan: "<span className="font-medium">{waForm.customerNameHint}</span>"</p>
+                        )}
+                        <Select value={waForm.customerId} onValueChange={v => setWaForm(f => ({ ...f, customerId: v }))}>
+                          <SelectTrigger><SelectValue placeholder="Pilih pelanggan..." /></SelectTrigger>
+                          <SelectContent>
+                            {(customers ?? []).map((c: any) => (
+                              <SelectItem key={c.id} value={c.id}>{c.name} — {c.customerType}</SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="grid grid-cols-2 gap-3">
+                        <div className="space-y-1.5">
+                          <Label>Jumlah (sak) <span className="text-destructive">*</span></Label>
+                          <Input type="number" min={1} value={waForm.orderedQty} onChange={e => setWaForm(f => ({ ...f, orderedQty: e.target.value }))} required />
+                        </div>
+                        <div className="space-y-1.5">
+                          <Label>Tanggal Kirim <span className="text-destructive">*</span></Label>
+                          <Input type="date" value={waForm.deliveryDate} onChange={e => setWaForm(f => ({ ...f, deliveryDate: e.target.value }))} required />
+                        </div>
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Harga/sak <span className="text-destructive">*</span></Label>
+                        <Input type="number" min={0} value={waForm.pricePerUnit} onChange={e => setWaForm(f => ({ ...f, pricePerUnit: e.target.value }))} placeholder="0" required />
+                      </div>
+                      <div className="space-y-1.5">
+                        <Label>Catatan</Label>
+                        <Input value={waForm.notes} onChange={e => setWaForm(f => ({ ...f, notes: e.target.value }))} placeholder="Catatan tambahan..." />
+                      </div>
+                      <DialogFooter>
+                        <Button type="button" variant="outline" onClick={() => setWaStep('paste')}>← Kembali</Button>
+                        <Button type="submit" disabled={waSubmitting || !waForm.customerId || !waForm.orderedQty || !waForm.pricePerUnit}>
+                          {waSubmitting ? 'Menyimpan...' : 'Buat Pesanan'}
+                        </Button>
+                      </DialogFooter>
+                    </form>
+                  )}
+                </DialogContent>
+              </Dialog>
+            )}
             {canWrite && (
               <Dialog open={newOrderOpen} onOpenChange={setNewOrderOpen}>
                 <DialogTrigger asChild>
