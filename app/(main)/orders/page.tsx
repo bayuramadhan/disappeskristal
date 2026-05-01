@@ -378,7 +378,7 @@ export default function OrdersPage() {
                   <TableHead>Channel</TableHead>
                   <TableHead>Tanggal Kirim</TableHead>
                   <TableHead className="text-right">Qty (sak)</TableHead>
-                  <TableHead className="text-right">Nilai Pesanan</TableHead>
+                  <TableHead className="text-right">Nilai</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
               </TableHeader>
@@ -390,7 +390,11 @@ export default function OrdersPage() {
                     <TableCell><ChannelTag channel={order.orderChannel} /></TableCell>
                     <TableCell className="text-sm">{order.deliveryDate ? format(new Date(order.deliveryDate), 'dd/MM/yyyy') : '-'}</TableCell>
                     <TableCell className="text-right text-sm">{order.orderedQty}</TableCell>
-                    <TableCell className="text-right text-sm">{formatCurrency(order.orderedQty * order.pricePerUnit)}</TableCell>
+                    <TableCell className="text-right text-sm">
+                      {['DELIVERED', 'PARTIAL'].includes(order.status)
+                        ? formatCurrency((order.deliveredQty ?? 0) * order.pricePerUnit)
+                        : formatCurrency(order.orderedQty * order.pricePerUnit)}
+                    </TableCell>
                     <TableCell><StatusBadge status={order.status} /></TableCell>
                   </TableRow>
                 ))}
