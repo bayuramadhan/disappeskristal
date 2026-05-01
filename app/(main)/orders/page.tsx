@@ -249,17 +249,56 @@ export default function OrdersPage() {
       const json = await res.json()
       if (!res.ok) { setWaParseErr(json.message ?? 'Gagal memparse'); return }
       const d = json.data
-      // Try to find customer by name
-      const hint = d.customerName ?? ''
+
+      const hint    = d.customerName ?? ''
       const matched = (customers ?? []).find((c: any) =>
         c.name.toLowerCase().includes(hint.toLowerCase()) ||
         (d.customerPhone && c.phone?.includes(d.customerPhone))
       )
+      const deliveryDate = d.deliveryDate ?? today
+      const orderedQty   = d.orderedQty != null ? String(d.orderedQty) : ''
+
+      // Coba auto-create jika semua field lengkap
+      if (matched && orderedQty) {
+        const params = new URLSearchParams({ customerType: matched.customerType, channel: 'HOTLINE' })
+        const priceRes  = await fetch(`/api/price-profiles?${params}`)
+        const priceJson = await priceRes.json()
+        const profiles: any[] = priceJson.data ?? []
+        const date  = new Date(deliveryDate)
+        const valid = profiles.filter(p => new Date(p.validFrom) <= date && date <= new Date(p.validUntil))
+        const price = (valid.find(p => p.rayonId === matched.rayonId) ?? valid.find(p => p.rayonId === null))?.price
+
+        if (price) {
+          // Semua lengkap — langsung buat pesanan
+          const orderRes = await fetch('/api/orders', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              customerId:   matched.id,
+              orderChannel: 'HOTLINE',
+              deliveryDate,
+              orderedQty:   Number(orderedQty),
+              pricePerUnit: price,
+              notes:        d.notes || undefined,
+            }),
+          })
+          if (orderRes.ok) {
+            setWaOpen(false)
+            setWaStep('paste')
+            setWaMessage('')
+            globalMutate(key => typeof key === 'string' && key.startsWith('/api/orders'))
+            toast({ title: 'Pesanan WA berhasil dibuat', description: `${matched.name} — ${orderedQty} sak`, variant: 'success' })
+            return
+          }
+        }
+      }
+
+      // Fallback ke review form jika ada yang kurang
       setWaForm({
         customerId:       matched?.id ?? '',
         customerNameHint: hint,
-        orderedQty:       d.orderedQty != null ? String(d.orderedQty) : '',
-        deliveryDate:     d.deliveryDate ?? today,
+        orderedQty,
+        deliveryDate,
         pricePerUnit:     '',
         notes:            d.notes ?? '',
       })
