@@ -292,15 +292,17 @@ model ProductionPlan {
 }
 
 model WarehouseStock {
-  id           String   @id @default(cuid())
-  date         DateTime @db.Date
-  openingStock Float    @default(0)
-  productionIn Float    @default(0)
-  loadingOut   Float    @default(0)
-  returnedIn   Float    @default(0)
-  closingStock Float    @default(0)
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+  id               String   @id @default(cuid())
+  date             DateTime @db.Date
+  openingStock     Float    @default(0)
+  productionIn     Float    @default(0)
+  loadingOut       Float    @default(0)
+  returnedIn       Float    @default(0)
+  adjustment       Float    @default(0)
+  adjustmentNotes  String?
+  closingStock     Float    @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
 
   @@unique([date])
   @@index([date])
