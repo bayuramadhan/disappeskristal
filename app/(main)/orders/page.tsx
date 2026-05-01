@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
-import { Plus, Search, X, Download, MessageSquare, Loader2 } from 'lucide-react'
+import { Plus, Search, X, Download, MessageSquare, Loader2, Inbox, Trash2 } from 'lucide-react'
 import Papa from 'papaparse'
 import { useOrders } from '@/hooks/useOrders'
 import { useCustomers } from '@/hooks/useCustomers'
@@ -46,6 +46,95 @@ const STATUS_LABELS: Record<string, string> = {
   REJECTED:  'Ditolak',
 }
 
+function DraftCard({ draft, customers, today, onPublish, onDelete, isReviewing, onReview }: {
+  draft: any; customers: any[]; today: string
+  onPublish: (draft: any, form: any) => Promise<void>
+  onDelete: () => void
+  isReviewing: boolean; onReview: () => void
+}) {
+  const [form, setForm] = useState({
+    customerId:   draft.customerId ?? '',
+    orderedQty:   draft.orderedQty != null ? String(draft.orderedQty) : '',
+    deliveryDate: draft.deliveryDate ?? today,
+    pricePerUnit: '',
+    notes:        draft.notes ?? '',
+  })
+  const [submitting, setSubmitting] = useState(false)
+  const [priceHint, setPriceHint]   = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!form.customerId || !form.deliveryDate) { setPriceHint(null); return }
+    const customer = customers.find((c: any) => c.id === form.customerId)
+    if (!customer) { setPriceHint(null); return }
+    const params = new URLSearchParams({ customerType: customer.customerType, channel: 'HOTLINE' })
+    fetch(`/api/price-profiles?${params}`)
+      .then(r => r.json())
+      .then(json => {
+        const profiles: any[] = json.data ?? []
+        const date  = new Date(form.deliveryDate)
+        const valid = profiles.filter(p => new Date(p.validFrom) <= date && date <= new Date(p.validUntil))
+        const match = valid.find(p => p.rayonId === customer.rayonId) ?? valid.find(p => p.rayonId === null)
+        if (match) { setForm(f => ({ ...f, pricePerUnit: String(match.price) })); setPriceHint(`Rp ${match.price.toLocaleString('id-ID')}/sak`) }
+        else setPriceHint(null)
+      })
+      .catch(() => setPriceHint(null))
+  }, [form.customerId, form.deliveryDate, customers])
+
+  return (
+    <div className="border rounded-lg p-3 space-y-2">
+      <div className="flex items-start justify-between gap-2">
+        <div className="text-xs text-muted-foreground flex-1 line-clamp-2 font-mono">{draft.rawMessage}</div>
+        <Button variant="ghost" size="icon" className="h-6 w-6 shrink-0 text-muted-foreground hover:text-destructive" onClick={onDelete}>
+          <Trash2 className="h-3.5 w-3.5" />
+        </Button>
+      </div>
+      <div className="flex gap-2 text-xs text-muted-foreground flex-wrap">
+        {draft.customerNameHint && <span className="bg-muted px-1.5 py-0.5 rounded">👤 {draft.customerNameHint}</span>}
+        {draft.orderedQty && <span className="bg-muted px-1.5 py-0.5 rounded">📦 {draft.orderedQty} sak</span>}
+        {draft.deliveryDate && <span className="bg-muted px-1.5 py-0.5 rounded">📅 {draft.deliveryDate}</span>}
+      </div>
+      <Button size="sm" variant="outline" className="w-full h-7 text-xs" onClick={onReview}>
+        {isReviewing ? '▲ Tutup form' : '▼ Lengkapi & Buat Pesanan'}
+      </Button>
+      {isReviewing && (
+        <form className="space-y-3 pt-1" onSubmit={async e => { e.preventDefault(); setSubmitting(true); await onPublish(draft, form); setSubmitting(false) }}>
+          <div className="space-y-1">
+            <Label className="text-xs">Pelanggan <span className="text-destructive">*</span></Label>
+            <Select value={form.customerId} onValueChange={v => setForm(f => ({ ...f, customerId: v }))}>
+              <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Pilih pelanggan..." /></SelectTrigger>
+              <SelectContent>
+                {customers.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name} — {c.customerType}</SelectItem>)}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <div className="space-y-1">
+              <Label className="text-xs">Jumlah (sak) <span className="text-destructive">*</span></Label>
+              <Input className="h-8 text-xs" type="number" min={1} value={form.orderedQty} onChange={e => setForm(f => ({ ...f, orderedQty: e.target.value }))} required />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs">Tanggal Kirim <span className="text-destructive">*</span></Label>
+              <Input className="h-8 text-xs" type="date" value={form.deliveryDate} onChange={e => setForm(f => ({ ...f, deliveryDate: e.target.value }))} required />
+            </div>
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Harga/sak <span className="text-destructive">*</span></Label>
+            <Input className="h-8 text-xs" type="number" min={0} value={form.pricePerUnit} onChange={e => { setForm(f => ({ ...f, pricePerUnit: e.target.value })); setPriceHint(null) }} placeholder="0" required />
+            {priceHint && <p className="text-xs text-emerald-600">Dari harga jual: {priceHint}</p>}
+          </div>
+          <div className="space-y-1">
+            <Label className="text-xs">Catatan</Label>
+            <Input className="h-8 text-xs" value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} placeholder="Opsional..." />
+          </div>
+          <Button type="submit" size="sm" className="w-full h-8 text-xs" disabled={submitting || !form.customerId || !form.orderedQty || !form.pricePerUnit}>
+            {submitting ? 'Menyimpan...' : 'Buat Pesanan'}
+          </Button>
+        </form>
+      )}
+    </div>
+  )
+}
+
 export default function OrdersPage() {
   const today = format(new Date(), 'yyyy-MM-dd')
   const [filters, setFilters]         = useState({ date: today, status: '', channel: '', search: '', page: 1 })
@@ -69,8 +158,10 @@ export default function OrdersPage() {
     customerId: '', customerNameHint: '', orderedQty: '',
     deliveryDate: today, pricePerUnit: '', notes: '',
   })
-  const [waSubmitting, setWaSubmitting] = useState(false)
-  const [waPriceHint, setWaPriceHint]   = useState<string | null>(null)
+  const [waSubmitting, setWaSubmitting]   = useState(false)
+  const [waPriceHint, setWaPriceHint]     = useState<string | null>(null)
+  const [draftOpen, setDraftOpen]         = useState(false)
+  const [draftReviewId, setDraftReviewId] = useState<string | null>(null)
 
   // Delivery log form
   const [deliveryOpen, setDeliveryOpen]   = useState(false)
@@ -81,6 +172,7 @@ export default function OrdersPage() {
   const { canWrite, isAdmin } = useRole()
   const { data, isLoading } = useOrders({ ...filters, limit: 20 })
   const { data: customers }  = useCustomers({ limit: 200 } as any)
+  const { data: waDrafts, mutate: mutateDrafts } = useSWR<any[]>('/api/wa-drafts', fetcher)
 
   // Auto-lookup harga dari PriceProfile
   useEffect(() => {
@@ -293,16 +385,31 @@ export default function OrdersPage() {
         }
       }
 
-      // Fallback ke review form jika ada yang kurang
-      setWaForm({
-        customerId:       matched?.id ?? '',
-        customerNameHint: hint,
-        orderedQty,
-        deliveryDate,
-        pricePerUnit:     '',
-        notes:            d.notes ?? '',
+      // Fallback — simpan sebagai draft lalu tutup dialog
+      await fetch('/api/wa-drafts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          rawMessage:       waMessage,
+          customerNameHint: hint,
+          customerId:       matched?.id ?? null,
+          orderedQty:       orderedQty ? Number(orderedQty) : null,
+          deliveryDate,
+          notes:            d.notes ?? null,
+        }),
       })
-      setWaStep('review')
+      globalMutate('/api/wa-drafts')
+      setWaOpen(false)
+      setWaStep('paste')
+      setWaMessage('')
+      const missing = []
+      if (!matched) missing.push('pelanggan')
+      if (!orderedQty) missing.push('jumlah')
+      toast({
+        title: 'Pesan disimpan sebagai draft',
+        description: `Belum lengkap: ${missing.join(', ')}. Buka antrian draft untuk melengkapi.`,
+        variant: 'warning' as any,
+      })
     } finally {
       setWaParsing(false)
     }
@@ -337,6 +444,38 @@ export default function OrdersPage() {
     } finally {
       setWaSubmitting(false)
     }
+  }
+
+  // ── Draft WA ──────────────────────────────────────────────────────────────
+  async function publishDraft(draft: any, form: { customerId: string; orderedQty: string; deliveryDate: string; pricePerUnit: string; notes: string }) {
+    const orderRes = await fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        customerId:   form.customerId,
+        orderChannel: 'HOTLINE',
+        deliveryDate: form.deliveryDate,
+        orderedQty:   Number(form.orderedQty),
+        pricePerUnit: Number(form.pricePerUnit),
+        notes:        form.notes || undefined,
+      }),
+    })
+    if (!orderRes.ok) {
+      const err = await orderRes.json().catch(() => ({}))
+      toast({ title: 'Gagal membuat pesanan', description: err.message, variant: 'destructive' })
+      return
+    }
+    await fetch(`/api/wa-drafts/${draft.id}`, { method: 'DELETE' })
+    mutateDrafts()
+    globalMutate(key => typeof key === 'string' && key.startsWith('/api/orders'))
+    setDraftReviewId(null)
+    toast({ title: 'Pesanan berhasil dibuat dari draft', variant: 'success' })
+  }
+
+  async function deleteDraft(id: string) {
+    await fetch(`/api/wa-drafts/${id}`, { method: 'DELETE' })
+    mutateDrafts()
+    toast({ title: 'Draft dihapus' })
   }
 
   // ── CSV Export ────────────────────────────────────────────────────────────
@@ -385,6 +524,15 @@ export default function OrdersPage() {
             <Button variant="outline" size="sm" className="gap-1.5" onClick={exportCSV}>
               <Download className="h-4 w-4" /> Export CSV
             </Button>
+            {canWrite && (waDrafts?.length ?? 0) > 0 && (
+              <Button variant="outline" size="sm" className="gap-1.5 relative" onClick={() => setDraftOpen(true)}>
+                <Inbox className="h-4 w-4" />
+                Draft WA
+                <span className="absolute -top-1.5 -right-1.5 bg-amber-500 text-white text-[10px] font-bold rounded-full w-4 h-4 flex items-center justify-center">
+                  {waDrafts!.length}
+                </span>
+              </Button>
+            )}
             {canWrite && (
               <Dialog open={waOpen} onOpenChange={v => { setWaOpen(v); if (!v) { setWaStep('paste'); setWaParseErr(''); setWaPriceHint(null) } }}>
                 <DialogTrigger asChild>
@@ -735,6 +883,33 @@ export default function OrdersPage() {
               </Button>
             </DialogFooter>
           </form>
+        </DialogContent>
+      </Dialog>
+
+      {/* Draft WA Queue */}
+      <Dialog open={draftOpen} onOpenChange={setDraftOpen}>
+        <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>Antrian Draft WA</DialogTitle>
+          </DialogHeader>
+          {(waDrafts ?? []).length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">Tidak ada draft.</p>
+          ) : (
+            <div className="space-y-3">
+              {(waDrafts ?? []).map((draft: any) => (
+                <DraftCard
+                  key={draft.id}
+                  draft={draft}
+                  customers={customers ?? []}
+                  today={today}
+                  onPublish={publishDraft}
+                  onDelete={() => deleteDraft(draft.id)}
+                  isReviewing={draftReviewId === draft.id}
+                  onReview={() => setDraftReviewId(draftReviewId === draft.id ? null : draft.id)}
+                />
+              ))}
+            </div>
+          )}
         </DialogContent>
       </Dialog>
 
