@@ -169,10 +169,7 @@ export default function ProductionPage() {
                       <CheckCircle2 className="h-4 w-4 text-emerald-600" />
                       <p className="text-sm font-medium text-emerald-800">Rencana sudah ada</p>
                     </div>
-                    <p className="text-2xl font-bold text-emerald-700">{existing.plannedQty} sak</p>
-                    <p className="text-xs text-emerald-600 mt-1">
-                      Realisasi: {existing.actualQty ?? '-'} sak
-                    </p>
+                    <p className="text-2xl font-bold text-emerald-700">{existing.actualProductionQty} sak</p>
                   </CardContent>
                 </Card>
               )}
