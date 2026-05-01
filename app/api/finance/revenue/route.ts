@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/db'
 import { requireAuth } from '@/lib/api/auth'
 import { apiSuccess, apiError, apiServerError, parseDate, todayDate } from '@/lib/api/response'
@@ -30,6 +31,9 @@ export async function GET(req: NextRequest) {
     if (endDate < startDate) {
       return apiError('endDate harus lebih besar dari startDate', 400)
     }
+
+    const vehicleFilter = vehicleId ? Prisma.sql`AND o."vehicleId" = ${vehicleId}` : Prisma.empty
+    const rayonFilter   = rayonId   ? Prisma.sql`AND o."rayonId"   = ${rayonId}`   : Prisma.empty
 
     // ── Per-day per-vehicle revenue via raw SQL ────────────────────────────
     const rows = await prisma.$queryRaw<{
@@ -68,8 +72,8 @@ export async function GET(req: NextRequest) {
         AND o."deletedAt" IS NULL
         AND o."deliveryDate" >= ${startDate}
         AND o."deliveryDate" <= ${endDate}
-        ${vehicleId ? prisma.$queryRaw`AND o."vehicleId" = ${vehicleId}` : prisma.$queryRaw``}
-        ${rayonId   ? prisma.$queryRaw`AND o."rayonId"   = ${rayonId}`   : prisma.$queryRaw``}
+        ${vehicleFilter}
+        ${rayonFilter}
       GROUP BY o."deliveryDate", o."vehicleId", v."plateNumber", o."rayonId", r."name"
       ORDER BY o."deliveryDate" DESC, "grossRevenue" DESC
     `

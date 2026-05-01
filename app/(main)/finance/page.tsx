@@ -111,7 +111,7 @@ export default function FinancePage() {
         {[
           { label: 'Gross Revenue',    value: formatCurrency(totals?.grossRevenue ?? 0),   icon: DollarSign,  color: 'text-emerald-600' },
           { label: 'Biaya Kendaraan',  value: formatCurrency(totals?.vehicleCost ?? 0),    icon: TrendingDown, color: 'text-destructive' },
-          { label: 'Net Revenue',      value: formatCurrency(totals?.netRevenue ?? 0),     icon: TrendingUp,  color: 'text-sky-600' },
+          { label: 'Net Revenue',      value: formatCurrency(totals?.netRevenue ?? 0),     icon: TrendingUp,  color: (totals?.netRevenue ?? 0) >= 0 ? 'text-sky-600' : 'text-destructive' },
           { label: 'Total Terkirim',   value: `${totals?.totalDeliveredQty ?? 0} sak`,    icon: Package,     color: 'text-violet-600' },
         ].map(m => (
           <Card key={m.label}>
