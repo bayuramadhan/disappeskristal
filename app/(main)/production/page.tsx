@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { format, addDays } from 'date-fns'
 import { id } from 'date-fns/locale'
-import { AlertTriangle, CheckCircle2, Package, TrendingUp, Factory, Truck } from 'lucide-react'
-import { useProductionRecommendation } from '@/hooks/useProduction'
+import { AlertTriangle, CheckCircle2, Package, TrendingUp, Factory, Truck, Warehouse } from 'lucide-react'
+import { useProductionRecommendation, useWarehouseStock } from '@/hooks/useProduction'
 import { useRole } from '@/hooks/useRole'
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingCards } from '@/components/shared/LoadingState'
@@ -13,20 +13,33 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { Separator } from '@/components/ui/separator'
 import { mutate } from 'swr'
 
 export default function ProductionPage() {
+  const today    = format(new Date(), 'yyyy-MM-dd')
   const tomorrow = format(addDays(new Date(), 1), 'yyyy-MM-dd')
   const [date, setDate] = useState(tomorrow)
+
+  // Production plan state
   const [actualQty, setActualQty] = useState('')
-  const [saving, setSaving] = useState(false)
-  const [saveMsg, setSaveMsg] = useState('')
+  const [saving, setSaving]       = useState(false)
+  const [saveMsg, setSaveMsg]     = useState('')
+
+  // Warehouse stock state
+  const [adjQty, setAdjQty]         = useState('')
+  const [adjNotes, setAdjNotes]     = useState('')
+  const [adjSaving, setAdjSaving]   = useState(false)
+  const [adjMsg, setAdjMsg]         = useState('')
+  const [initQty, setInitQty]       = useState('')
+  const [initSaving, setInitSaving] = useState(false)
 
   const { isAdmin } = useRole()
   const { data, isLoading, error } = useProductionRecommendation(date)
+  const { data: stock, mutate: mutateStock } = useWarehouseStock(today)
 
-  const calc = data?.calculation
-  const ctx = data?.context
+  const calc     = data?.calculation
+  const ctx      = data?.context
   const existing = data?.existingPlan
   const warnings = data?.warnings ?? []
 
@@ -36,21 +49,68 @@ export default function ProductionPage() {
     setSaveMsg('')
     try {
       const method = existing ? 'PATCH' : 'POST'
-      const url = existing ? `/api/production/plans/${existing.id}` : '/api/production/plans'
-      const res = await fetch(url, {
+      const url    = existing ? `/api/production/plans/${existing.id}` : '/api/production/plans'
+      const res    = await fetch(url, {
         method,
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ productionDate: date, plannedQty: Number(actualQty) }),
       })
+      const json = await res.json()
       if (res.ok) {
         setSaveMsg('Rencana produksi berhasil disimpan')
         mutate(`/api/production/recommendation?date=${date}`)
+        mutateStock()
         setActualQty('')
       } else {
-        setSaveMsg('Gagal menyimpan')
+        setSaveMsg(json.message ?? 'Gagal menyimpan')
       }
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function initStock() {
+    if (!initQty) return
+    setInitSaving(true)
+    try {
+      const res  = await fetch('/api/warehouse/stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'init', date: today, openingStock: Number(initQty) }),
+      })
+      const json = await res.json()
+      if (res.ok) {
+        mutateStock()
+        setInitQty('')
+      } else {
+        setAdjMsg(json.message ?? 'Gagal mencatat stok awal')
+      }
+    } finally {
+      setInitSaving(false)
+    }
+  }
+
+  async function applyAdjustment() {
+    if (!adjQty) return
+    setAdjSaving(true)
+    setAdjMsg('')
+    try {
+      const res  = await fetch('/api/warehouse/stock', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'adjust', date: today, adjustment: Number(adjQty), notes: adjNotes || undefined }),
+      })
+      const json = await res.json()
+      if (res.ok) {
+        setAdjMsg('Penyesuaian berhasil diterapkan')
+        mutateStock()
+        setAdjQty('')
+        setAdjNotes('')
+      } else {
+        setAdjMsg(json.message ?? 'Gagal menyimpan')
+      }
+    } finally {
+      setAdjSaving(false)
     }
   }
 
@@ -161,7 +221,6 @@ export default function ProductionPage() {
                 </CardContent>
               </Card>
 
-              {/* Existing plan */}
               {existing && (
                 <Card className="border-emerald-200 bg-emerald-50/50">
                   <CardContent className="pt-5">
@@ -176,9 +235,9 @@ export default function ProductionPage() {
             </div>
           </div>
 
-          {/* Set actual quantity — ADMIN only */}
+          {/* Production plan input — ADMIN only */}
           {isAdmin && (
-            <Card>
+            <Card className="mb-6">
               <CardHeader>
                 <CardTitle className="text-base">{existing ? 'Update Rencana Produksi' : 'Tetapkan Rencana Produksi'}</CardTitle>
               </CardHeader>
@@ -202,6 +261,102 @@ export default function ProductionPage() {
                   <p className={`text-sm mt-2 ${saveMsg.includes('berhasil') ? 'text-emerald-600' : 'text-destructive'}`}>
                     {saveMsg}
                   </p>
+                )}
+              </CardContent>
+            </Card>
+          )}
+
+          {/* Warehouse stock — today */}
+          {isAdmin && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base flex items-center gap-2">
+                  <Warehouse className="h-5 w-5 text-slate-600" />
+                  Stok Gudang Hari Ini
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {!stock ? (
+                  /* No record yet — show init form */
+                  <div className="space-y-3">
+                    <p className="text-sm text-muted-foreground">Belum ada catatan stok untuk hari ini. Masukkan stok awal untuk mulai tracking.</p>
+                    <div className="flex items-end gap-3">
+                      <div className="space-y-1.5 flex-1 max-w-xs">
+                        <Label>Stok Awal (sak)</Label>
+                        <Input type="number" min={0} value={initQty} onChange={e => setInitQty(e.target.value)} placeholder="0" />
+                      </div>
+                      <Button onClick={initStock} disabled={initSaving || !initQty}>
+                        {initSaving ? 'Menyimpan...' : 'Catat Stok Awal'}
+                      </Button>
+                    </div>
+                    {adjMsg && <p className="text-sm text-destructive">{adjMsg}</p>}
+                  </div>
+                ) : (
+                  <div className="space-y-4">
+                    {/* Stock breakdown */}
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                      {[
+                        { label: 'Stok Awal',   value: stock.openingStock, color: 'text-slate-700' },
+                        { label: 'Produksi',     value: stock.productionIn, color: 'text-emerald-600' },
+                        { label: 'Terkirim',     value: -stock.loadingOut,  color: 'text-red-600' },
+                        { label: 'Retur Masuk',  value: stock.returnedIn,   color: 'text-sky-600' },
+                      ].map(item => (
+                        <div key={item.label} className="rounded-lg border px-3 py-2 text-center">
+                          <p className="text-xs text-muted-foreground">{item.label}</p>
+                          <p className={`text-lg font-bold ${item.color}`}>
+                            {item.value > 0 ? '+' : ''}{item.value}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+
+                    {stock.adjustment !== 0 && (
+                      <div className="text-sm text-muted-foreground">
+                        Penyesuaian: <span className={stock.adjustment > 0 ? 'text-emerald-600 font-medium' : 'text-destructive font-medium'}>
+                          {stock.adjustment > 0 ? '+' : ''}{stock.adjustment} sak
+                        </span>
+                        {stock.adjustmentNotes && <span className="ml-1">({stock.adjustmentNotes})</span>}
+                      </div>
+                    )}
+
+                    <Separator />
+
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold">Stok Akhir Saat Ini</span>
+                      <span className={`text-2xl font-black ${stock.closingStock < 50 ? 'text-amber-600' : 'text-slate-800'}`}>
+                        {stock.closingStock} sak
+                      </span>
+                    </div>
+
+                    {/* Adjustment form */}
+                    <Separator />
+                    <p className="text-sm font-medium">Penyesuaian Manual</p>
+                    <p className="text-xs text-muted-foreground">Gunakan nilai positif untuk penambahan (produksi tambahan, temuan stok) atau negatif untuk pengurangan (susut, pecah, hilang).</p>
+                    <div className="flex flex-wrap items-end gap-3">
+                      <div className="space-y-1.5">
+                        <Label className="text-xs">Jumlah (±sak)</Label>
+                        <Input
+                          type="number"
+                          value={adjQty}
+                          onChange={e => setAdjQty(e.target.value)}
+                          placeholder="mis. -5 atau +10"
+                          className="w-36"
+                        />
+                      </div>
+                      <div className="space-y-1.5 flex-1 min-w-48">
+                        <Label className="text-xs">Keterangan</Label>
+                        <Input value={adjNotes} onChange={e => setAdjNotes(e.target.value)} placeholder="Susut, pecah, dll." />
+                      </div>
+                      <Button variant="outline" onClick={applyAdjustment} disabled={adjSaving || !adjQty}>
+                        {adjSaving ? 'Menyimpan...' : 'Terapkan'}
+                      </Button>
+                    </div>
+                    {adjMsg && (
+                      <p className={`text-sm ${adjMsg.includes('berhasil') ? 'text-emerald-600' : 'text-destructive'}`}>
+                        {adjMsg}
+                      </p>
+                    )}
+                  </div>
                 )}
               </CardContent>
             </Card>
