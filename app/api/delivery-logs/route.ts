@@ -6,6 +6,7 @@ import {
   parsePagination, makeMeta, parseDate, todayDate,
 } from '@/lib/api/response'
 import { deliveryLogSchema } from '@/lib/validations'
+import { syncWarehouseStock } from '@/lib/warehouse'
 
 // ─── Derived order status from qty ───────────────────────────────────────────
 function deriveOrderStatus(
@@ -157,6 +158,13 @@ export async function POST(req: NextRequest) {
         }),
       ] : []),
     ])
+
+    // Sync warehouse stock: deliveredQty goes out, returnedQty comes back
+    const stockDate = new Date(order.deliveryDate)
+    await syncWarehouseStock(stockDate, {
+      loadingOut: deliveredQty,
+      returnedIn: returnedQty ?? 0,
+    }).catch(() => {}) // non-blocking: stock sync failure must not break delivery log
 
     const fullLog = await prisma.deliveryLog.findUnique({
       where: { id: log.id },

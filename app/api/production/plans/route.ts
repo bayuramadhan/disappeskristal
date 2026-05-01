@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/db'
 import { requireAuth } from '@/lib/api/auth'
 import { apiCreated, apiError, apiServerError, parseDate, tomorrowDate } from '@/lib/api/response'
+import { syncWarehouseStock } from '@/lib/warehouse'
 import { z } from 'zod'
 
 const planSchema = z.object({
@@ -36,6 +37,8 @@ export async function POST(req: NextRequest) {
         recommendedProductionQty: 0,
       },
     })
+
+    await syncWarehouseStock(date, { productionIn: plannedQty }).catch(() => {})
 
     return apiCreated({ ...plan, plannedQty: plan.actualProductionQty }, 'Rencana produksi berhasil disimpan')
   } catch (err) {
