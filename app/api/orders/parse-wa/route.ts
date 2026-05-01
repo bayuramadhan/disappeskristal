@@ -1,33 +1,106 @@
 import { NextRequest } from 'next/server'
-import { GoogleGenerativeAI } from '@google/generative-ai'
 import { requireAuth } from '@/lib/api/auth'
 import { apiSuccess, apiError, apiServerError } from '@/lib/api/response'
 
-const PROMPT = `Kamu adalah asisten yang membantu mengekstrak informasi pesanan es kristal dari pesan WhatsApp.
+function fmt(d: Date) { return d.toISOString().slice(0, 10) }
 
-Ekstrak informasi berikut dari pesan di bawah dan kembalikan dalam format JSON:
-- customerName: nama pelanggan (string, wajib)
-- customerPhone: nomor telepon jika ada (string atau null)
-- orderedQty: jumlah pesanan dalam sak (number, wajib — jika tidak disebutkan anggap null)
-- deliveryDate: tanggal pengiriman format YYYY-MM-DD (string atau null — hari ini: {TODAY}, besok: {TOMORROW})
-- notes: catatan tambahan jika ada (string atau null)
+// ─── Rule-based WA message parser ────────────────────────────────────────────
+function parseWAMessage(message: string) {
+  const text = message.trim()
+  const lower = text.toLowerCase()
 
-Aturan:
-- Jika pesan menyebut "besok" gunakan tanggal besok, "hari ini" gunakan tanggal hari ini
-- Jika ada angka yang jelas untuk jumlah sak, gunakan itu
-- Nama pelanggan bisa dari teks seperti "ini [nama]", "dari [nama]", atau awalan pesan
-- Kembalikan HANYA JSON valid, tanpa penjelasan lain
+  const today    = new Date()
+  const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1)
+  const dayAfter = new Date(today); dayAfter.setDate(today.getDate() + 2)
 
-Pesan WhatsApp:
-{MESSAGE}`
+  // ── Qty ───────────────────────────────────────────────────────────────────
+  // Match patterns: "10 sak", "pesan 5", "order 20 karung", "minta 3sak"
+  const qtyPatterns = [
+    /(\d+)\s*(?:sak|karung|bag|pcs|unit)/i,
+    /(?:pesan|order|minta|beli|butuh|mau|request)\s+(\d+)/i,
+    /(\d+)\s+(?:sak|karung)/i,
+  ]
+  let orderedQty: number | null = null
+  for (const pat of qtyPatterns) {
+    const m = text.match(pat)
+    if (m) { orderedQty = parseInt(m[1]); break }
+  }
 
+  // ── Date ─────────────────────────────────────────────────────────────────
+  // "besok", "hari ini", "lusa", "tgl 5", "tanggal 15 Mei", "5/5", "2026-05-05"
+  let deliveryDate: string = fmt(tomorrow) // default besok
+  if (/hari\s*ini|sekarang|today/i.test(lower)) {
+    deliveryDate = fmt(today)
+  } else if (/lusa|overmorgen/i.test(lower)) {
+    deliveryDate = fmt(dayAfter)
+  } else if (/besok|tomorrow/i.test(lower)) {
+    deliveryDate = fmt(tomorrow)
+  } else {
+    // "tgl 15" / "tanggal 5 Mei" / "5 Mei" / "15/5" / "2026-05-15"
+    const isoMatch = text.match(/(\d{4}-\d{2}-\d{2})/)
+    if (isoMatch) {
+      deliveryDate = isoMatch[1]
+    } else {
+      const months: Record<string, number> = {
+        jan:1, feb:2, mar:3, apr:4, mei:5, jun:6,
+        jul:7, agu:8, sep:9, okt:10, nov:11, des:12,
+        may:5, aug:8, oct:10, dec:12,
+      }
+      const longDate = text.match(/(?:tgl|tanggal)?\s*(\d{1,2})\s+([a-zA-Z]{3,})/i)
+      if (longDate) {
+        const day   = parseInt(longDate[1])
+        const month = months[longDate[2].toLowerCase().slice(0, 3)]
+        if (month) {
+          const year = today.getFullYear()
+          const d    = new Date(year, month - 1, day)
+          // If date already passed this year, assume next year
+          if (d < today) d.setFullYear(year + 1)
+          deliveryDate = fmt(d)
+        }
+      } else {
+        // "5/5" or "15/05"
+        const slashDate = text.match(/(\d{1,2})\/(\d{1,2})(?:\/(\d{2,4}))?/)
+        if (slashDate) {
+          const day   = parseInt(slashDate[1])
+          const month = parseInt(slashDate[2])
+          const year  = slashDate[3] ? parseInt(slashDate[3]) : today.getFullYear()
+          const fullYear = year < 100 ? 2000 + year : year
+          deliveryDate = fmt(new Date(fullYear, month - 1, day))
+        }
+      }
+    }
+  }
+
+  // ── Phone ─────────────────────────────────────────────────────────────────
+  const phoneMatch = text.match(/(?:\+62|62|0)[\s-]?8[\d\s-]{8,13}/)
+  const customerPhone = phoneMatch
+    ? phoneMatch[0].replace(/[\s-]/g, '')
+    : null
+
+  // ── Customer name ─────────────────────────────────────────────────────────
+  // "ini Pak Budi", "dari Toko Maju", "saya Bu Ani", "nama: Warung Segar"
+  const namePatterns = [
+    /(?:ini|saya|kami|dari|nama[:\s]+|customer[:\s]+)\s+([A-Z][a-zA-Z\s]{2,30})/,
+    /^([A-Z][a-zA-Z\s]{2,20})(?:\s+(?:mau|pesan|order|beli|minta))/,
+  ]
+  let customerName: string | null = null
+  for (const pat of namePatterns) {
+    const m = text.match(pat)
+    if (m) { customerName = m[1].trim(); break }
+  }
+
+  // ── Notes ─────────────────────────────────────────────────────────────────
+  // Anything after "catatan:", "note:", "keterangan:", or "ps:"
+  const notesMatch = text.match(/(?:catatan|note|keterangan|ps)[:\s]+(.+)/i)
+  const notes = notesMatch ? notesMatch[1].trim() : null
+
+  return { customerName, customerPhone, orderedQty, deliveryDate, notes }
+}
+
+// ─── POST /api/orders/parse-wa ────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   const { error } = await requireAuth()
   if (error) return error
-
-  if (!process.env.GEMINI_API_KEY) {
-    return apiError('GEMINI_API_KEY belum dikonfigurasi', 503)
-  }
 
   try {
     const { message } = await req.json()
@@ -35,45 +108,8 @@ export async function POST(req: NextRequest) {
       return apiError('Pesan tidak boleh kosong', 400)
     }
 
-    const today    = new Date()
-    const tomorrow = new Date(today)
-    tomorrow.setDate(tomorrow.getDate() + 1)
-    const fmt = (d: Date) => d.toISOString().slice(0, 10)
-
-    const prompt = PROMPT
-      .replace('{TODAY}',    fmt(today))
-      .replace('{TOMORROW}', fmt(tomorrow))
-      .replace('{MESSAGE}',  message.trim())
-
-    const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY)
-    const model = genAI.getGenerativeModel({ model: 'gemini-2.0-flash-lite' })
-    const result = await model.generateContent(prompt)
-    const text   = result.response.text().trim()
-
-    // Strip markdown code fences if present
-    const json = text.replace(/^```(?:json)?\n?/i, '').replace(/\n?```$/, '').trim()
-
-    let parsed: {
-      customerName:  string | null
-      customerPhone: string | null
-      orderedQty:    number | null
-      deliveryDate:  string | null
-      notes:         string | null
-    }
-
-    try {
-      parsed = JSON.parse(json)
-    } catch {
-      return apiError('Gagal memparse respons AI. Coba lagi atau periksa format pesan.', 422)
-    }
-
-    return apiSuccess({
-      customerName:  parsed.customerName  ?? null,
-      customerPhone: parsed.customerPhone ?? null,
-      orderedQty:    parsed.orderedQty    ?? null,
-      deliveryDate:  parsed.deliveryDate  ?? fmt(tomorrow),
-      notes:         parsed.notes         ?? null,
-    })
+    const result = parseWAMessage(message)
+    return apiSuccess(result)
   } catch (err) {
     return apiServerError(err)
   }
