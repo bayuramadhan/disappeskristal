@@ -78,10 +78,12 @@ function parseWAMessage(message: string) {
     : null
 
   // ── Customer name ─────────────────────────────────────────────────────────
-  // "ini Pak Budi", "dari Toko Maju", "saya Bu Ani", "nama: Warung Segar"
+  // Priority: "dari [Toko]" beats "ini [Orang] dari [Toko]" — store name after "dari"
   const namePatterns = [
-    /(?:ini|saya|kami|dari|nama[:\s]+|customer[:\s]+)\s+([A-Z][a-zA-Z\s]{2,30})/,
-    /^([A-Z][a-zA-Z\s]{2,20})(?:\s+(?:mau|pesan|order|beli|minta))/,
+    /\bdari\s+([A-Z][a-zA-Z\s]{2,30})/,                          // "dari Warung Sedap" / "Pak Budi dari Warung Sedap"
+    /(?:nama[:\s]+|customer[:\s]+)\s*([A-Z][a-zA-Z\s]{2,30})/,  // "nama: Warung Segar"
+    /(?:ini|saya|kami)\s+([A-Z][a-zA-Z\s]{2,20})/,              // "ini Pak Budi" (fallback — orang, bukan toko)
+    /^([A-Z][a-zA-Z\s]{2,20})(?:\s+(?:mau|pesan|order|beli|minta))/, // "Warung Segar mau pesan..."
   ]
   let customerName: string | null = null
   for (const pat of namePatterns) {
