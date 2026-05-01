@@ -603,6 +603,18 @@ export default function OrdersPage() {
                             </Button>
                           )}
                           <div className="flex gap-2">
+                          {o.status === 'PARTIAL' && canWrite && (
+                            <Button
+                              size="sm" variant="outline" className="flex-1"
+                              disabled={actionLoading}
+                              onClick={() => {
+                                if (confirm(`Selesaikan pesanan ini sebagai terkirim? Order akan ditutup dengan ${o.deliveredQty ?? 0} sak terkirim dari ${o.orderedQty} sak yang dipesan.`))
+                                  updateOrderStatus(o.id, 'DELIVERED')
+                              }}
+                            >
+                              Selesaikan
+                            </Button>
+                          )}
                           {o.status === 'CREATED' && canWrite && (
                             <Button
                               size="sm" className="flex-1"
