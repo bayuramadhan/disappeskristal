@@ -18,6 +18,14 @@ function MetricCard({
   title: string; value: string; sub?: string
   icon: React.ElementType; color?: string
 }) {
+  const bgMap: Record<string, string> = {
+    'text-sky-600':    'bg-sky-50',
+    'text-emerald-600':'bg-emerald-50',
+    'text-violet-600': 'bg-violet-50',
+    'text-amber-600':  'bg-amber-50',
+    'text-slate-600':  'bg-slate-50',
+  }
+  const bgColor = bgMap[color] ?? 'bg-sky-50'
   return (
     <Card>
       <CardContent className="pt-6">
@@ -27,7 +35,7 @@ function MetricCard({
             <p className="text-2xl font-bold mt-1">{value}</p>
             {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
           </div>
-          <div className="rounded-lg bg-sky-50 p-2">
+          <div className={`rounded-lg ${bgColor} p-2`}>
             <Icon className={`h-5 w-5 ${color}`} />
           </div>
         </div>
@@ -119,7 +127,7 @@ export default function DashboardPage() {
               value={`${stockLevel} sak`}
               sub={`Update: ${data?.warehouse?.date ? format(new Date(data.warehouse.date), 'dd/MM') : '-'}`}
               icon={Package}
-              color={stockLevel < 50 ? 'text-amber-600' : 'text-amber-600'}
+              color={stockLevel < 50 ? 'text-amber-600' : 'text-slate-600'}
             />
           </div>
 

@@ -86,8 +86,6 @@ export async function GET(req: NextRequest) {
     // Aggregate order totals across all statuses
     const totalOrders     = ordersByStatus.reduce((s, g) => s + g._count.id, 0)
     const totalOrderedQty = ordersByStatus.reduce((s, g) => s + (g._sum.orderedQty ?? 0), 0)
-    const deliveredOrders = ordersByStatus.find(g => g.status === 'DELIVERED')
-    const partialOrders   = ordersByStatus.find(g => g.status === 'PARTIAL')
 
     // Revenue: sum(deliveredQty * pricePerUnit) requires raw because groupBy _sum can't multiply
     const revenueRaw = await prisma.$queryRaw<{ total: number }[]>`
