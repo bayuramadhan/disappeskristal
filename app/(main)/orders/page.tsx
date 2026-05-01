@@ -70,6 +70,7 @@ export default function OrdersPage() {
     deliveryDate: today, pricePerUnit: '', notes: '',
   })
   const [waSubmitting, setWaSubmitting] = useState(false)
+  const [waPriceHint, setWaPriceHint]   = useState<string | null>(null)
 
   // Delivery log form
   const [deliveryOpen, setDeliveryOpen]   = useState(false)
@@ -115,6 +116,31 @@ export default function OrdersPage() {
       })
       .catch(() => setPriceHint(null))
   }, [newOrderForm.customerId, newOrderForm.orderChannel, newOrderForm.deliveryDate, customers])
+
+  // Auto-lookup harga untuk WA form
+  useEffect(() => {
+    const { customerId, deliveryDate } = waForm
+    if (!customerId || !deliveryDate) { setWaPriceHint(null); return }
+    const customer = (customers ?? []).find((c: any) => c.id === customerId)
+    if (!customer) { setWaPriceHint(null); return }
+    const params = new URLSearchParams({ customerType: customer.customerType, channel: 'HOTLINE' })
+    fetch(`/api/price-profiles?${params}`)
+      .then(r => r.json())
+      .then(json => {
+        const profiles: any[] = json.data ?? []
+        const date  = new Date(deliveryDate)
+        const valid = profiles.filter(p => new Date(p.validFrom) <= date && date <= new Date(p.validUntil))
+        const match = valid.find(p => p.rayonId === customer.rayonId) ?? valid.find(p => p.rayonId === null)
+        if (match) {
+          setWaForm(f => ({ ...f, pricePerUnit: String(match.price) }))
+          setWaPriceHint(`Dari harga jual: Rp ${match.price.toLocaleString('id-ID')}/sak`)
+        } else {
+          setWaPriceHint('Tidak ada harga terdaftar untuk kombinasi ini')
+        }
+      })
+      .catch(() => setWaPriceHint(null))
+  }, [waForm.customerId, waForm.deliveryDate, customers])
+
   const selectedOrderDetail  = useSWR(selectedOrder ? `/api/orders/${selectedOrder.id}` : null, fetcher)
 
   const setFilter = (key: string, value: string) =>
@@ -321,7 +347,7 @@ export default function OrdersPage() {
               <Download className="h-4 w-4" /> Export CSV
             </Button>
             {canWrite && (
-              <Dialog open={waOpen} onOpenChange={v => { setWaOpen(v); if (!v) { setWaStep('paste'); setWaParseErr('') } }}>
+              <Dialog open={waOpen} onOpenChange={v => { setWaOpen(v); if (!v) { setWaStep('paste'); setWaParseErr(''); setWaPriceHint(null) } }}>
                 <DialogTrigger asChild>
                   <Button variant="outline" size="sm" className="gap-1.5">
                     <MessageSquare className="h-4 w-4" /> Import WA
@@ -378,7 +404,12 @@ export default function OrdersPage() {
                       </div>
                       <div className="space-y-1.5">
                         <Label>Harga/sak <span className="text-destructive">*</span></Label>
-                        <Input type="number" min={0} value={waForm.pricePerUnit} onChange={e => setWaForm(f => ({ ...f, pricePerUnit: e.target.value }))} placeholder="0" required />
+                        <Input type="number" min={0} value={waForm.pricePerUnit} onChange={e => { setWaForm(f => ({ ...f, pricePerUnit: e.target.value })); setWaPriceHint(null) }} placeholder="0" required />
+                        {waPriceHint && (
+                          <p className={`text-xs ${waPriceHint.startsWith('Tidak') ? 'text-amber-600' : 'text-emerald-600'}`}>
+                            {waPriceHint}
+                          </p>
+                        )}
                       </div>
                       <div className="space-y-1.5">
                         <Label>Catatan</Label>
