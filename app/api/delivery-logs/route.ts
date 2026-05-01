@@ -103,8 +103,12 @@ export async function POST(req: NextRequest) {
     if (!vehicle) return apiError('Kendaraan tidak ditemukan', 404)
     if (!driver)  return apiError('Driver tidak ditemukan', 404)
 
-    // Determine new order status
-    const newOrderStatus = deriveOrderStatus(order.orderedQty, deliveredQty, returnedQty ?? 0)
+    // Accumulate qty across multiple delivery logs (for PARTIAL orders)
+    const totalDelivered = (order.deliveredQty ?? 0) + deliveredQty
+    const totalReturned  = (order.returnedQty  ?? 0) + (returnedQty ?? 0)
+
+    // Determine new order status based on cumulative qty
+    const newOrderStatus = deriveOrderStatus(order.orderedQty, totalDelivered, totalReturned)
 
     // Find active fleet entry for this vehicle on delivery date
     const deliveryDate = new Date(order.deliveryDate)
@@ -139,8 +143,8 @@ export async function POST(req: NextRequest) {
       prisma.order.update({
         where: { id: orderId },
         data: {
-          deliveredQty,
-          returnedQty:  returnedQty ?? 0,
+          deliveredQty: totalDelivered,
+          returnedQty:  totalReturned,
           status:       newOrderStatus as any,
         },
       }),
