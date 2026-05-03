@@ -49,7 +49,7 @@ function checkRoleAccess(pathname: string, method: string, role: string): boolea
   return false
 }
 
-const PUBLIC_API = ['/api/auth']
+const PUBLIC_API = ['/api/auth', '/api/webhook/fonnte']
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl

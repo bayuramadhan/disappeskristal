@@ -443,6 +443,7 @@ model VehicleMaintenance {
 model WaDraft {
   id               String    @id @default(cuid())
   rawMessage       String    @db.Text
+  sender           String?
   customerNameHint String?
   customerId       String?
   orderedQty       Float?

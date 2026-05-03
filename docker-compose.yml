@@ -27,6 +27,8 @@ services:
       - "3000:3000"
     environment:
       DATABASE_URL: postgresql://distribusi_user:distribusi_pass@postgres:5432/distribusi_pro?schema=public
+      DIRECT_URL: postgresql://distribusi_user:distribusi_pass@postgres:5432/distribusi_pro?schema=public
+      FONNTE_TOKEN: ${FONNTE_TOKEN:-Wvg6rbR5oDRWUtFhcTNq}
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-distribusipro-secret-dev-2024}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       NODE_ENV: production
