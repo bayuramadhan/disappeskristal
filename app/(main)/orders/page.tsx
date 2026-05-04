@@ -401,7 +401,6 @@ export default function OrdersPage() {
               </Button>
             )}
             {canWrite && (
-            {canWrite && (
               <Dialog open={newOrderOpen} onOpenChange={setNewOrderOpen}>
                 <DialogTrigger asChild>
                   <Button size="sm" className="gap-1.5">
