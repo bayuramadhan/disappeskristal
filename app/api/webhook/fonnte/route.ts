@@ -151,9 +151,15 @@ export async function POST(req: NextRequest) {
 
       const priceProfile = priceProfiles[0]
       if (priceProfile) {
+        // Generate orderNumber
+        const dateStr    = new Date(parsed.deliveryDate).toISOString().slice(0, 10).replace(/-/g, '')
+        const todayCount = await prisma.order.count({ where: { orderNumber: { startsWith: `ORD-${dateStr}-` } } })
+        const orderNumber = `ORD-${dateStr}-${String(todayCount + 1).padStart(3, '0')}`
+
         // Buat order langsung
         const order = await prisma.order.create({
           data: {
+            orderNumber,
             customerId: customer.id,
             orderChannel: 'HOTLINE',
             deliveryDate: new Date(parsed.deliveryDate),
