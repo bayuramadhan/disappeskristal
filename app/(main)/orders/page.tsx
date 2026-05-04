@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { format } from 'date-fns'
 import { Plus, Search, X, Download, MessageSquare, Loader2, Inbox, Trash2 } from 'lucide-react'
 import Papa from 'papaparse'
@@ -140,6 +140,8 @@ export default function OrdersPage() {
   const today = format(new Date(), 'yyyy-MM-dd')
   const [filters, setFilters]         = useState({ date: today, status: '', channel: '', search: '', page: 1 })
   const [selectedOrder, setSelectedOrder] = useState<any>(null)
+  // Ref untuk orderId dari URL (?orderId=) — di-clear setelah order ditemukan
+  const pendingOrderId = useRef<string | null>(null)
   const [newOrderOpen, setNewOrderOpen]   = useState(false)
   const [newOrderForm, setNewOrderForm]   = useState({
     customerId: '', orderChannel: 'PREORDER', deliveryDate: today,
@@ -174,6 +176,26 @@ export default function OrdersPage() {
   const { data, isLoading } = useOrders({ ...filters, limit: 20 })
   const { data: customers }  = useCustomers({ limit: 200 } as any)
   const { data: waDrafts, mutate: mutateDrafts } = useSWR<any[]>('/api/wa-drafts', fetcher)
+
+  // Baca ?date= dan ?orderId= dari URL saat mount (dari klik notifikasi)
+  useEffect(() => {
+    const params  = new URLSearchParams(window.location.search)
+    const urlDate = params.get('date')
+    const urlId   = params.get('orderId')
+    if (urlDate) setFilters(f => ({ ...f, date: urlDate }))
+    if (urlId)   pendingOrderId.current = urlId
+  }, [])
+
+  // Auto-buka detail pesanan ketika data sudah load dan ada pendingOrderId
+  useEffect(() => {
+    if (!pendingOrderId.current || isLoading) return
+    const orders: any[] = data?.orders ?? data ?? []
+    const found = orders.find((o: any) => o.id === pendingOrderId.current)
+    if (found) {
+      setSelectedOrder(found)
+      pendingOrderId.current = null
+    }
+  }, [data, isLoading])
 
   // Auto-lookup harga dari PriceProfile
   useEffect(() => {
