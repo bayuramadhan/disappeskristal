@@ -1,7 +1,6 @@
 'use client'
 
 import { useEffect, useRef, useState, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import { Bell, MessageSquare, ShoppingCart, CheckCheck } from 'lucide-react'
 import { format, formatDistanceToNow } from 'date-fns'
 import { id as localeId } from 'date-fns/locale'
@@ -35,7 +34,6 @@ function save(notifs: Notif[]) {
 }
 
 export function NotificationBell() {
-  const router              = useRouter()
   const [open, setOpen]     = useState(false)
   const [notifs, setNotifs] = useState<Notif[]>([])
   const esRef               = useRef<EventSource | null>(null)
@@ -69,7 +67,8 @@ export function NotificationBell() {
   const handleClick = (n: Notif) => {
     setNotifs(prev => prev.map(p => p.id === n.id ? { ...p, read: true } : p))
     setOpen(false)
-    router.push(n.href)
+    // Full navigation agar orders page remount dan baca URL params dari awal
+    window.location.href = n.href
   }
 
   const connect = useCallback(() => {
