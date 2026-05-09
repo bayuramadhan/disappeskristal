@@ -209,9 +209,9 @@ export default function CustomerDetailPage() {
         <Card>
           <CardContent className="pt-6 flex items-center gap-3">
             <Phone className="h-5 w-5 text-muted-foreground shrink-0" />
-            <div>
-              <p className="text-xs text-muted-foreground">No. HP</p>
-              <p className="font-medium">{customer.phone ?? '-'}</p>
+            <div className="min-w-0">
+              <p className="text-xs text-muted-foreground">No. WA Toko</p>
+              <p className="font-medium truncate">{customer.phone ?? '-'}</p>
             </div>
           </CardContent>
         </Card>

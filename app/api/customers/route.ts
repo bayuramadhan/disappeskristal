@@ -41,6 +41,13 @@ export async function GET(req: NextRequest) {
       where.OR = [
         { name:  { contains: search, mode: 'insensitive' } },
         { phone: { contains: search, mode: 'insensitive' } },
+        { pics: { some: {
+          deletedAt: null,
+          OR: [
+            { name:  { contains: search, mode: 'insensitive' } },
+            { phone: { contains: search, mode: 'insensitive' } },
+          ],
+        }}},
         { locations: { some: {
           deletedAt: null,
           OR: [
@@ -62,6 +69,12 @@ export async function GET(req: NextRequest) {
             where:   { deletedAt: null },
             orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
             include: locationInclude,
+          },
+          pics: {
+            where:   { deletedAt: null, isActive: true },
+            orderBy: { createdAt: 'asc' },
+            take:    1,
+            select:  { id: true, name: true, phone: true, jabatan: true },
           },
           _count: { select: { orders: true } },
         },

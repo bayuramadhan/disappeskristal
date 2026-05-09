@@ -159,7 +159,7 @@ export default function CustomersPage() {
                     </div>
                   </div>
                   <div className="space-y-1.5">
-                    <Label>No. HP</Label>
+                    <Label>No. WA Toko <span className="text-muted-foreground text-xs">(untuk notifikasi otomatis)</span></Label>
                     <Input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="08xx..." />
                   </div>
                 </div>
@@ -238,7 +238,7 @@ export default function CustomersPage() {
                 </div>
               </div>
               <div className="space-y-1.5">
-                <Label>No. HP</Label>
+                <Label>No. WA Toko <span className="text-muted-foreground text-xs">(untuk notifikasi otomatis)</span></Label>
                 <Input value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} placeholder="08xx..." />
               </div>
               <div className="space-y-1.5">
@@ -292,7 +292,7 @@ export default function CustomersPage() {
                   <TableHead>Tipe</TableHead>
                   <TableHead>Lokasi Default</TableHead>
                   <TableHead>Rayon</TableHead>
-                  <TableHead>No. HP</TableHead>
+                  <TableHead>PIC</TableHead>
                   <TableHead>Status</TableHead>
                   <TableHead />
                 </TableRow>
@@ -320,7 +320,14 @@ export default function CustomersPage() {
                         ) : <span className="text-muted-foreground">—</span>}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">{defaultLoc?.rayon?.name ?? '-'}</TableCell>
-                      <TableCell className="text-sm">{c.phone ?? '-'}</TableCell>
+                      <TableCell className="text-sm">
+                        {c.pics?.[0] ? (
+                          <div>
+                            <p className="font-medium text-xs">{c.pics[0].name}</p>
+                            <p className="text-muted-foreground text-xs">{c.pics[0].phone ?? c.pics[0].jabatan ?? ''}</p>
+                          </div>
+                        ) : <span className="text-muted-foreground">—</span>}
+                      </TableCell>
                       <TableCell>
                         <Badge variant={c.activeStatus ? 'success' : 'destructive'}>
                           {c.activeStatus ? 'Aktif' : 'Nonaktif'}
