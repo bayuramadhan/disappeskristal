@@ -82,6 +82,32 @@ async function main() {
   ])
   console.log(`✅ Created ${drivers.length} drivers`)
 
+  // ── ARMADA (pairing driver + kendaraan, 5 aktif) ──────────────────────────
+  //   vehicle[4] = MAINTENANCE, driver[4] = ON_LEAVE → tidak masuk armada aktif
+  const armadaHelpers = ['Rudi', 'Slamet', 'Toni', 'Wawan', 'Yudi']
+  const armadaPairs: Array<{ vehicleIdx: number; driverIdx: number; rayonIdx: number }> = [
+    { vehicleIdx: 0, driverIdx: 0, rayonIdx: 0 }, // B 1234 ABC / Ahmad  / Rayon Utara
+    { vehicleIdx: 1, driverIdx: 1, rayonIdx: 1 }, // B 5678 DEF / Budi   / Rayon Selatan
+    { vehicleIdx: 2, driverIdx: 2, rayonIdx: 2 }, // B 9012 GHI / Cahyo  / Rayon Timur
+    { vehicleIdx: 3, driverIdx: 3, rayonIdx: 3 }, // B 3456 JKL / Dedi   / Rayon Barat
+    { vehicleIdx: 5, driverIdx: 5, rayonIdx: 4 }, // B 1111 PQR / Fajar  / Rayon Pusat
+  ]
+
+  const armadas = await Promise.all(
+    armadaPairs.map((p, i) =>
+      prisma.armada.create({
+        data: {
+          vehicleId:    vehicles[p.vehicleIdx].id,
+          driverId:     drivers[p.driverIdx].id,
+          helperName:   armadaHelpers[i],
+          rayonId:      rayons[p.rayonIdx].id,
+          activeStatus: true,
+        },
+      })
+    )
+  )
+  console.log(`✅ Created ${armadas.length} armadas`)
+
   // ── CUSTOMER (20) ─────────────────────────────────────────────────────────
   const customerNames = [
     'Toko Maju Jaya',      'Warung Bu Siti',        'Depot Air Sejuk',    'Toko Berkah',
@@ -204,26 +230,28 @@ async function main() {
   console.log(`✅ Created price profiles`)
 
   // ── FLEET DAILY STATUS (7 hari terakhir) ──────────────────────────────────
+  // Dibuat dari data Armada aktif — konsisten dengan auto-create di /api/armada/daily
   const activeVehicles = vehicles.filter(v => v.status === 'ACTIVE')
   const activeDrivers  = drivers.filter(d => d.status === 'ACTIVE')
 
   for (let d = 0; d < 7; d++) {
-    for (let v = 0; v < Math.min(activeVehicles.length, activeDrivers.length); v++) {
+    for (const arm of armadas) {
+      const veh = vehicles.find(v => v.id === arm.vehicleId)!
       await prisma.fleetDailyStatus.create({
         data: {
-          date:         daysAgo(d),
-          vehicleId:    activeVehicles[v].id,
-          driverId:     activeDrivers[v].id,
-          rayonId:      rayons[v % rayons.length].id,
-          helperName:   `Helper ${v + 1}`,
-          activeStatus: true,
-          initialLoad:  rand(120, 200),
-          remainingLoad: rand(0, 30),
+          date:          daysAgo(d),
+          vehicleId:     arm.vehicleId,
+          driverId:      arm.driverId,
+          rayonId:       arm.rayonId!,
+          helperName:    arm.helperName,
+          activeStatus:  true,
+          initialLoad:   veh.capacitySak,
+          remainingLoad: rand(0, Math.floor(veh.capacitySak * 0.2)),
         },
       })
     }
   }
-  console.log(`✅ Created fleet daily status (7 days)`)
+  console.log(`✅ Created fleet daily status (7 days × ${armadas.length} armadas)`)
 
   // ── VEHICLE COST (10 hari terakhir, semua kendaraan aktif) ────────────────
   for (let d = 0; d < 10; d++) {
