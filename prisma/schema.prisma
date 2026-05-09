@@ -86,10 +86,10 @@ model Rayon {
   createdAt        DateTime  @default(now())
   updatedAt        DateTime  @updatedAt
 
-  customers        Customer[]
-  orders           Order[]
-  fleetDailyStatus FleetDailyStatus[]
-  priceProfiles    PriceProfile[]
+  customerLocations CustomerLocation[]
+  orders            Order[]
+  fleetDailyStatus  FleetDailyStatus[]
+  priceProfiles     PriceProfile[]
 }
 
 model Vehicle {
@@ -144,25 +144,44 @@ model Customer {
   id           String       @id @default(cuid())
   name         String
   phone        String?
-  address      String?
-  rayonId      String?
   customerType CustomerType @default(WARUNG)
   defaultPrice Float        @default(0)
   notes        String?
-  gpsLat       Float?
-  gpsLng       Float?
   activeStatus Boolean      @default(true)
   deletedAt    DateTime?
   createdAt    DateTime     @default(now())
   updatedAt    DateTime     @updatedAt
 
+  locations CustomerLocation[]
+  orders    Order[]
+  waDrafts  WaDraft[]
+
+  @@index([activeStatus])
+  @@index([customerType])
+}
+
+model CustomerLocation {
+  id           String    @id @default(cuid())
+  customerId   String
+  namaLokasi   String                      // nama toko / cabang
+  alamat       String?
+  rayonId      String?
+  gpsLat       Float?
+  gpsLng       Float?
+  isDefault    Boolean   @default(false)
+  activeStatus Boolean   @default(true)
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  customer Customer  @relation(fields: [customerId], references: [id], onDelete: Cascade)
   rayon    Rayon?    @relation(fields: [rayonId], references: [id])
   orders   Order[]
   waDrafts WaDraft[]
 
+  @@index([customerId])
   @@index([rayonId])
-  @@index([activeStatus])
-  @@index([customerType])
+  @@index([isDefault])
 }
 
 enum CustomerType {
@@ -197,32 +216,35 @@ model FleetDailyStatus {
 }
 
 model Order {
-  id            String       @id @default(cuid())
-  orderNumber   String?      @unique
-  customerId    String
-  vehicleId     String?
-  rayonId       String?
-  orderChannel  OrderChannel @default(PREORDER)
-  orderType     String?
-  orderedQty    Float        @default(0)
-  deliveredQty  Float        @default(0)
-  returnedQty   Float        @default(0)
-  additionalQty Float        @default(0)
-  pricePerUnit  Float        @default(0)
-  status        OrderStatus  @default(CREATED)
-  notes         String?
-  deliveryDate  DateTime     @db.Date
-  deletedAt     DateTime?
-  createdAt     DateTime     @default(now())
-  updatedAt     DateTime     @updatedAt
+  id                 String       @id @default(cuid())
+  orderNumber        String?      @unique
+  customerId         String
+  deliveryLocationId String?                      // lokasi toko tujuan pengiriman
+  vehicleId          String?
+  rayonId            String?                      // di-derive dari deliveryLocation.rayonId
+  orderChannel       OrderChannel @default(PREORDER)
+  orderType          String?
+  orderedQty         Float        @default(0)
+  deliveredQty       Float        @default(0)
+  returnedQty        Float        @default(0)
+  additionalQty      Float        @default(0)
+  pricePerUnit       Float        @default(0)
+  status             OrderStatus  @default(CREATED)
+  notes              String?
+  deliveryDate       DateTime     @db.Date
+  deletedAt          DateTime?
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
 
-  customer     Customer      @relation(fields: [customerId], references: [id])
-  vehicle      Vehicle?      @relation(fields: [vehicleId], references: [id])
-  rayon        Rayon?        @relation(fields: [rayonId], references: [id])
-  deliveryLogs DeliveryLog[]
+  customer         Customer          @relation(fields: [customerId], references: [id])
+  deliveryLocation CustomerLocation? @relation(fields: [deliveryLocationId], references: [id])
+  vehicle          Vehicle?          @relation(fields: [vehicleId], references: [id])
+  rayon            Rayon?            @relation(fields: [rayonId], references: [id])
+  deliveryLogs     DeliveryLog[]
 
   @@index([deliveryDate, status])
   @@index([customerId])
+  @@index([deliveryLocationId])
   @@index([vehicleId, deliveryDate])
   @@index([rayonId, deliveryDate])
   @@index([status])
@@ -441,17 +463,19 @@ model VehicleMaintenance {
 // ==================== WA DRAFT ====================
 
 model WaDraft {
-  id               String    @id @default(cuid())
-  rawMessage       String    @db.Text
-  sender           String?
-  customerNameHint String?
-  customerId       String?
-  orderedQty       Float?
-  deliveryDate     String?
-  notes            String?
-  createdAt        DateTime  @default(now())
+  id                 String    @id @default(cuid())
+  rawMessage         String    @db.Text
+  sender             String?
+  customerNameHint   String?
+  customerId         String?
+  deliveryLocationId String?
+  orderedQty         Float?
+  deliveryDate       String?
+  notes              String?
+  createdAt          DateTime  @default(now())
 
-  customer Customer? @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  customer         Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
+  deliveryLocation CustomerLocation? @relation(fields: [deliveryLocationId], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
 }

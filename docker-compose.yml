@@ -15,12 +15,14 @@ services:
       test: ["CMD-SHELL", "pg_isready -U distribusi_user -d distribusi_pro"]
       interval: 5s
       timeout: 5s
-      retries: 5
+      retries: 10
 
   app:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        DOCKER_BUILD: "1"
     container_name: distribusipro_app
     restart: unless-stopped
     ports:
@@ -28,21 +30,15 @@ services:
     environment:
       DATABASE_URL: postgresql://distribusi_user:distribusi_pass@postgres:5432/distribusi_pro?schema=public
       DIRECT_URL: postgresql://distribusi_user:distribusi_pass@postgres:5432/distribusi_pro?schema=public
-      FONNTE_TOKEN: ${FONNTE_TOKEN:-Wvg6rbR5oDRWUtFhcTNq}
-      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-distribusipro-secret-dev-2024}
+      FONNTE_TOKEN: ${FONNTE_TOKEN:-}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-distribusipro-secret-change-in-production}
       NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
       NODE_ENV: production
       PORT: 3000
-      HOSTNAME: 0.0.0.0
+      HOSTNAME: "0.0.0.0"
     depends_on:
       postgres:
         condition: service_healthy
-    command: >
-      sh -c "
-        npx prisma migrate deploy &&
-        (./node_modules/.bin/ts-node --compiler-options '{\"module\":\"CommonJS\"}' prisma/seed.ts || echo 'Seed skipped (data mungkin sudah ada)') &&
-        npm start
-      "
 
 volumes:
   postgres_data:
