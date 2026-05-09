@@ -53,19 +53,35 @@ function DraftCard({ draft, customers, today, onPublish, onDelete, isReviewing, 
   isReviewing: boolean; onReview: () => void
 }) {
   const [form, setForm] = useState({
-    customerId:   draft.customerId ?? '',
-    orderedQty:   draft.orderedQty != null ? String(draft.orderedQty) : '',
-    deliveryDate: draft.deliveryDate ?? today,
-    pricePerUnit: '',
-    notes:        draft.notes ?? '',
+    customerId:         draft.customerId ?? '',
+    deliveryLocationId: draft.deliveryLocationId ?? '',
+    orderedQty:         draft.orderedQty != null ? String(draft.orderedQty) : '',
+    deliveryDate:       draft.deliveryDate ?? today,
+    pricePerUnit:       '',
+    notes:              draft.notes ?? '',
   })
   const [submitting, setSubmitting] = useState(false)
   const [priceHint, setPriceHint]   = useState<string | null>(null)
 
+  // Auto-set deliveryLocationId ke default location saat customer berubah
+  useEffect(() => {
+    const customer = customers.find((c: any) => c.id === form.customerId)
+    const defaultLoc = customer?.locations?.find((l: any) => l.isDefault) ?? customer?.locations?.[0]
+    setForm(f => ({ ...f, deliveryLocationId: defaultLoc?.id ?? '' }))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [form.customerId, customers])
+
+  // Auto-lookup harga dari PriceProfile (gunakan rayonId dari lokasi yang dipilih)
   useEffect(() => {
     if (!form.customerId || !form.deliveryDate) { setPriceHint(null); return }
     const customer = customers.find((c: any) => c.id === form.customerId)
     if (!customer) { setPriceHint(null); return }
+
+    const selectedLoc = customer.locations?.find((l: any) => l.id === form.deliveryLocationId)
+      ?? customer.locations?.find((l: any) => l.isDefault)
+      ?? customer.locations?.[0]
+    const locationRayonId = selectedLoc?.rayonId ?? null
+
     const params = new URLSearchParams({ customerType: customer.customerType, channel: 'HOTLINE' })
     fetch(`/api/price-profiles?${params}`)
       .then(r => r.json())
@@ -73,12 +89,12 @@ function DraftCard({ draft, customers, today, onPublish, onDelete, isReviewing, 
         const profiles: any[] = json.data ?? []
         const date  = new Date(form.deliveryDate)
         const valid = profiles.filter(p => new Date(p.validFrom) <= date && date <= new Date(p.validUntil))
-        const match = valid.find(p => p.rayonId === customer.rayonId) ?? valid.find(p => p.rayonId === null)
+        const match = valid.find(p => p.rayonId === locationRayonId) ?? valid.find(p => p.rayonId === null)
         if (match) { setForm(f => ({ ...f, pricePerUnit: String(match.price) })); setPriceHint(`Rp ${match.price.toLocaleString('id-ID')}/sak`) }
         else setPriceHint(null)
       })
       .catch(() => setPriceHint(null))
-  }, [form.customerId, form.deliveryDate, customers])
+  }, [form.customerId, form.deliveryLocationId, form.deliveryDate, customers])
 
   return (
     <div className="border rounded-lg p-3 space-y-2">
@@ -108,6 +124,26 @@ function DraftCard({ draft, customers, today, onPublish, onDelete, isReviewing, 
               </SelectContent>
             </Select>
           </div>
+          {/* Location picker — hanya jika customer punya >1 lokasi */}
+          {(() => {
+            const locs: any[] = customers.find((c: any) => c.id === form.customerId)?.locations ?? []
+            if (locs.length <= 1) return null
+            return (
+              <div className="space-y-1">
+                <Label className="text-xs">Lokasi Pengiriman <span className="text-destructive">*</span></Label>
+                <Select value={form.deliveryLocationId} onValueChange={v => setForm(f => ({ ...f, deliveryLocationId: v }))}>
+                  <SelectTrigger className="h-8 text-xs"><SelectValue placeholder="Pilih lokasi..." /></SelectTrigger>
+                  <SelectContent>
+                    {locs.map((l: any) => (
+                      <SelectItem key={l.id} value={l.id}>
+                        {l.namaLokasi}{l.isDefault ? ' ★' : ''}{l.rayon ? ` — ${l.rayon.name}` : ''}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )
+          })()}
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
               <Label className="text-xs">Jumlah (sak) <span className="text-destructive">*</span></Label>
@@ -326,17 +362,18 @@ export default function OrdersPage() {
   }
 
   // ── Draft WA ──────────────────────────────────────────────────────────────
-  async function publishDraft(draft: any, form: { customerId: string; orderedQty: string; deliveryDate: string; pricePerUnit: string; notes: string }) {
+  async function publishDraft(draft: any, form: { customerId: string; deliveryLocationId: string; orderedQty: string; deliveryDate: string; pricePerUnit: string; notes: string }) {
     const orderRes = await fetch('/api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        customerId:   form.customerId,
-        orderChannel: 'HOTLINE',
-        deliveryDate: form.deliveryDate,
-        orderedQty:   Number(form.orderedQty),
-        pricePerUnit: Number(form.pricePerUnit),
-        notes:        form.notes || undefined,
+        customerId:         form.customerId,
+        deliveryLocationId: form.deliveryLocationId || undefined,
+        orderChannel:       'HOTLINE',
+        deliveryDate:       form.deliveryDate,
+        orderedQty:         Number(form.orderedQty),
+        pricePerUnit:       Number(form.pricePerUnit),
+        notes:              form.notes || undefined,
       }),
     })
     if (!orderRes.ok) {
@@ -365,10 +402,11 @@ export default function OrdersPage() {
       return
     }
     const rows = orders.map((o: any) => ({
-      'No. Pesanan':    o.orderNumber,
-      'Pelanggan':      o.customer?.name ?? '-',
-      'Tipe Pelanggan': o.customer?.customerType ?? '-',
-      'Rayon':          o.rayon?.name ?? '-',
+      'No. Pesanan':       o.orderNumber,
+      'Pelanggan':         o.customer?.name ?? '-',
+      'Tipe Pelanggan':    o.customer?.customerType ?? '-',
+      'Lokasi Pengiriman': o.deliveryLocation?.namaLokasi ?? '-',
+      'Rayon':             o.rayon?.name ?? '-',
       'Channel':        o.orderChannel,
       'Tanggal Kirim':  o.deliveryDate ? format(new Date(o.deliveryDate), 'dd/MM/yyyy') : '-',
       'Qty Dipesan':    o.orderedQty,
