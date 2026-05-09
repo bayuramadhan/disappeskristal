@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import {
   LayoutDashboard, ShoppingCart, Truck, Users, BarChart3,
-  Factory, ChevronLeft, ChevronRight, IceCream2, MapPin, Tag, Settings2,
+  Factory, ChevronLeft, ChevronRight, IceCream2, MapPin, Tag, Settings2, Navigation2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useRole } from '@/hooks/useRole'
@@ -15,7 +15,7 @@ type NavItem = { href: string; label: string; icon: React.ElementType; roles: st
 const operationalNav: NavItem[] = [
   { href: '/dashboard',  label: 'Dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'SUPERVISOR', 'OPERATOR'] },
   { href: '/orders',     label: 'Pesanan',   icon: ShoppingCart,    roles: ['ADMIN', 'SUPERVISOR', 'OPERATOR'] },
-  { href: '/armada',     label: 'Armada',    icon: Truck,           roles: ['ADMIN', 'SUPERVISOR', 'OPERATOR'] },
+  { href: '/armada',     label: 'Pengiriman', icon: Navigation2,     roles: ['ADMIN', 'SUPERVISOR', 'OPERATOR'] },
   { href: '/finance',    label: 'Keuangan',  icon: BarChart3,       roles: ['ADMIN', 'SUPERVISOR'] },
   { href: '/production', label: 'Produksi',  icon: Factory,         roles: ['ADMIN', 'SUPERVISOR'] },
 ]

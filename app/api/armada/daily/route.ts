@@ -102,6 +102,10 @@ export async function GET(req: NextRequest) {
           // Override helper/rayon dari master armada jika FleetDailyStatus belum diupdate
           helperName: f.helperName ?? masterArmada?.helperName ?? null,
           armadaId:   masterArmada?.id ?? null,
+          // Data master armada untuk deteksi perubahan di Log Harian
+          masterArmadaDriverId: masterArmada?.driverId   ?? null,
+          masterArmadaRayonId:  masterArmada?.rayonId    ?? null,
+          masterArmadaHelper:   masterArmada?.helperName ?? null,
           orders,
           stats: {
             totalOrders:  orders.length,
