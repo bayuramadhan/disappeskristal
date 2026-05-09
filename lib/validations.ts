@@ -50,7 +50,6 @@ export const driverSchema = z.object({
 
 export const customerSchema = z.object({
   name:         z.string().min(2, 'Nama customer minimal 2 karakter'),
-  phone:        z.string().optional(),
   customerType: z.enum(['WARUNG', 'DEPOT', 'TOKO']),
   defaultPrice: z.number().min(0).default(0),
   notes:        z.string().optional(),

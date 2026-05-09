@@ -104,7 +104,6 @@ async function main() {
       const customer = await prisma.customer.create({
         data: {
           name,
-          phone:        `0813-${String(9000 + i).padStart(4, '0')}`,
           customerType: inferType(name),
           defaultPrice: 15_000 + i * 500,
           activeStatus: true,

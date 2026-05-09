@@ -134,7 +134,7 @@ export async function POST(req: NextRequest) {
     const parsed = parseWAMessage(message)
     console.log('Parsed:', parsed)
 
-    // ── Customer lookup: sender phone number first (paling reliable), lalu nama ──
+    // ── Customer lookup: cari via PIC phone dulu, lalu nama customer ────────────
     const customerInclude = {
       locations: {
         where:   { isDefault: true, deletedAt: null as null },
@@ -147,10 +147,24 @@ export async function POST(req: NextRequest) {
 
     if (sender) {
       const normalized = normalizePhone(String(sender))
-      customer = await prisma.customer.findFirst({
-        where:   { phone: { contains: normalized.slice(-8) } }, // 8 digit akhir
-        include: customerInclude,
+      const suffix8    = normalized.slice(-8)
+
+      // Cari lewat PIC aktif yang phone-nya cocok
+      const pic = await prisma.customerPIC.findFirst({
+        where: {
+          phone:     { contains: suffix8 },
+          isActive:  true,
+          deletedAt: null,
+        },
+        select: { customerId: true },
       })
+
+      if (pic) {
+        customer = await prisma.customer.findFirst({
+          where:   { id: pic.customerId, deletedAt: null },
+          include: customerInclude,
+        })
+      }
     }
 
     if (!customer && parsed.customerName) {

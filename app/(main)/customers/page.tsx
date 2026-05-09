@@ -24,12 +24,12 @@ const TYPE_OPTIONS = ['WARUNG', 'DEPOT', 'TOKO']
 
 const emptyForm = {
   // info customer
-  name: '', phone: '', customerType: 'WARUNG', defaultPrice: '', notes: '',
+  name: '', customerType: 'WARUNG', defaultPrice: '', notes: '',
   // lokasi pertama
   namaLokasi: '', alamat: '', rayonId: '',
 }
 const emptyEditForm = {
-  name: '', phone: '', customerType: 'WARUNG', defaultPrice: '', notes: '',
+  name: '', customerType: 'WARUNG', defaultPrice: '', notes: '',
 }
 
 export default function CustomersPage() {
@@ -58,7 +58,6 @@ export default function CustomersPage() {
     setEditId(c.id)
     setEditForm({
       name:         c.name,
-      phone:        c.phone        ?? '',
       customerType: c.customerType,
       defaultPrice: String(c.defaultPrice ?? ''),
       notes:        c.notes        ?? '',
@@ -73,7 +72,6 @@ export default function CustomersPage() {
     try {
       const body = {
         name:         form.name,
-        phone:        form.phone        || undefined,
         customerType: form.customerType,
         defaultPrice: form.defaultPrice ? Number(form.defaultPrice) : 0,
         notes:        form.notes        || undefined,
@@ -158,10 +156,6 @@ export default function CustomersPage() {
                         onChange={e => setForm(f => ({ ...f, defaultPrice: e.target.value }))} placeholder="0" />
                     </div>
                   </div>
-                  <div className="space-y-1.5">
-                    <Label>No. WA Toko <span className="text-muted-foreground text-xs">(untuk notifikasi otomatis)</span></Label>
-                    <Input value={form.phone} onChange={e => setForm(f => ({ ...f, phone: e.target.value }))} placeholder="08xx..." />
-                  </div>
                 </div>
 
                 <Separator />
@@ -236,10 +230,6 @@ export default function CustomersPage() {
                   <Input type="number" min={0} value={editForm.defaultPrice}
                     onChange={e => setEditForm(f => ({ ...f, defaultPrice: e.target.value }))} placeholder="0" />
                 </div>
-              </div>
-              <div className="space-y-1.5">
-                <Label>No. WA Toko <span className="text-muted-foreground text-xs">(untuk notifikasi otomatis)</span></Label>
-                <Input value={editForm.phone} onChange={e => setEditForm(f => ({ ...f, phone: e.target.value }))} placeholder="08xx..." />
               </div>
               <div className="space-y-1.5">
                 <Label>Catatan</Label>

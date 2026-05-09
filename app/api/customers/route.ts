@@ -40,7 +40,6 @@ export async function GET(req: NextRequest) {
     if (search) {
       where.OR = [
         { name:  { contains: search, mode: 'insensitive' } },
-        { phone: { contains: search, mode: 'insensitive' } },
         { pics: { some: {
           deletedAt: null,
           OR: [

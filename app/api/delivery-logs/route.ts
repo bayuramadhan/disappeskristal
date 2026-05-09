@@ -56,7 +56,7 @@ export async function GET(req: NextRequest) {
             select: {
               id: true, orderedQty: true, deliveredQty: true,
               returnedQty: true, pricePerUnit: true, status: true,
-              customer: { select: { id: true, name: true, phone: true } },
+              customer: { select: { id: true, name: true } },
             },
           },
           vehicle: { select: { id: true, plateNumber: true } },

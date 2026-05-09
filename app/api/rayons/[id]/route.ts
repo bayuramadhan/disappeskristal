@@ -18,7 +18,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
         customerLocations: {
           where:   { deletedAt: null, activeStatus: true },
           select:  { id: true, namaLokasi: true, alamat: true,
-                     customer: { select: { id: true, name: true, phone: true, customerType: true } } },
+                     customer: { select: { id: true, name: true, customerType: true } } },
           orderBy: { namaLokasi: 'asc' },
         },
         _count: { select: { customerLocations: true, orders: true } },

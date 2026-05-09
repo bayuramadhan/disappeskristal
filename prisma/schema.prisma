@@ -143,7 +143,6 @@ enum DriverStatus {
 model Customer {
   id           String       @id @default(cuid())
   name         String
-  phone        String?
   customerType CustomerType @default(WARUNG)
   defaultPrice Float        @default(0)
   notes        String?

@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
         take:    limit,
         orderBy: [{ deliveryDate: 'desc' }, { createdAt: 'desc' }],
         include: {
-          customer:         { select: { id: true, name: true, phone: true, customerType: true } },
+          customer:         { select: { id: true, name: true, customerType: true } },
           deliveryLocation: { select: { id: true, namaLokasi: true, alamat: true } },
           vehicle:          { select: { id: true, plateNumber: true } },
           rayon:            { select: { id: true, name: true } },
@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
         notes:        notes ?? null,
       },
       include: {
-        customer:         { select: { id: true, name: true, phone: true } },
+        customer:         { select: { id: true, name: true } },
         deliveryLocation: { select: { id: true, namaLokasi: true, alamat: true } },
         vehicle:          { select: { id: true, plateNumber: true } },
         rayon:            { select: { id: true, name: true } },

@@ -210,8 +210,10 @@ export default function CustomerDetailPage() {
           <CardContent className="pt-6 flex items-center gap-3">
             <Phone className="h-5 w-5 text-muted-foreground shrink-0" />
             <div className="min-w-0">
-              <p className="text-xs text-muted-foreground">No. WA Toko</p>
-              <p className="font-medium truncate">{customer.phone ?? '-'}</p>
+              <p className="text-xs text-muted-foreground">No. WA (PIC Aktif)</p>
+              <p className="font-medium truncate">
+                {customer.pics?.find((p: any) => p.isActive)?.phone ?? '-'}
+              </p>
             </div>
           </CardContent>
         </Card>
