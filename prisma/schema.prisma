@@ -153,11 +153,30 @@ model Customer {
   updatedAt    DateTime     @updatedAt
 
   locations CustomerLocation[]
+  pics      CustomerPIC[]
   orders    Order[]
   waDrafts  WaDraft[]
 
   @@index([activeStatus])
   @@index([customerType])
+}
+
+model CustomerPIC {
+  id         String    @id @default(cuid())
+  customerId String
+  name       String
+  phone      String?
+  jabatan    String?                       // posisi / jabatan di toko
+  isActive   Boolean   @default(true)     // PIC aktif saat ini
+  notes      String?
+  deletedAt  DateTime?
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Cascade)
+
+  @@index([customerId])
+  @@index([customerId, isActive])
 }
 
 model CustomerLocation {

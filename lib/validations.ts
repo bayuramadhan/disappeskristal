@@ -56,6 +56,14 @@ export const customerSchema = z.object({
   notes:        z.string().optional(),
 })
 
+export const customerPICSchema = z.object({
+  name:     z.string().min(1, 'Nama PIC wajib diisi'),
+  phone:    z.string().optional(),
+  jabatan:  z.string().optional(),
+  isActive: z.boolean().optional(),
+  notes:    z.string().optional(),
+})
+
 export const customerLocationSchema = z.object({
   namaLokasi: z.string().min(1, 'Nama lokasi wajib diisi'),
   alamat:     z.string().optional(),
@@ -186,7 +194,8 @@ export type RegisterInput = z.infer<typeof registerSchema>
 export type RayonInput = z.infer<typeof rayonSchema>
 export type VehicleInput = z.infer<typeof vehicleSchema>
 export type DriverInput = z.infer<typeof driverSchema>
-export type CustomerInput = z.infer<typeof customerSchema>
+export type CustomerInput    = z.infer<typeof customerSchema>
+export type CustomerPICInput = z.infer<typeof customerPICSchema>
 export type OrderInput = z.infer<typeof orderSchema>
 export type UpdateOrderStatusInput = z.infer<typeof updateOrderStatusSchema>
 export type FleetDailyStatusInput = z.infer<typeof fleetDailyStatusSchema>

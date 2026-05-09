@@ -10,6 +10,12 @@ const locationInclude = {
   rayon: { select: { id: true, name: true } },
 }
 
+const picInclude = {
+  where:   { deletedAt: null },
+  orderBy: [{ isActive: 'desc' as const }, { createdAt: 'asc' as const }],
+  select:  { id: true, name: true, phone: true, jabatan: true, isActive: true, notes: true, createdAt: true },
+}
+
 // ─── GET /api/customers/[id] ──────────────────────────────────────────────────
 export async function GET(_req: NextRequest, { params }: Params) {
   const { error } = await requireAuth()
@@ -24,6 +30,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
           orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
           include: locationInclude,
         },
+        pics: picInclude,
       },
     })
     if (!customer) return apiNotFound('Customer')
@@ -94,6 +101,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
           orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
           include: locationInclude,
         },
+        pics: picInclude,
       },
     })
 

@@ -5,7 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import { format } from 'date-fns'
 import {
   ArrowLeft, Phone, Tag, ShoppingBag, Plus, Pencil, Trash2,
-  MapPin, Star, CheckCircle2,
+  MapPin, Star, CheckCircle2, UserCheck, UserX, Users,
 } from 'lucide-react'
 import { useCustomer } from '@/hooks/useCustomers'
 import { useRayons } from '@/hooks/useCustomers'
@@ -26,6 +26,7 @@ import { useRole } from '@/hooks/useRole'
 import { useToast } from '@/hooks/use-toast'
 
 const emptyLocForm = { namaLokasi: '', alamat: '', rayonId: '', isDefault: false }
+const emptyPICForm = { name: '', phone: '', jabatan: '', isActive: true, notes: '' }
 
 export default function CustomerDetailPage() {
   const { id }   = useParams<{ id: string }>()
@@ -43,6 +44,14 @@ export default function CustomerDetailPage() {
   const [locError, setLocError]   = useState('')
   const [locSaving, setLocSaving] = useState(false)
 
+  // ── PIC dialog state ───────────────────────────────────────────
+  const [picOpen, setPicOpen]     = useState(false)
+  const [editPicId, setEditPicId] = useState<string | null>(null)
+  const [picForm, setPicForm]     = useState(emptyPICForm)
+  const [picError, setPicError]   = useState('')
+  const [picSaving, setPicSaving] = useState(false)
+  const [showAllPic, setShowAllPic] = useState(false)
+
   if (isLoading) return <div className="p-6"><LoadingState rows={6} /></div>
   if (error || !customer) return (
     <div className="text-center py-16">
@@ -54,8 +63,13 @@ export default function CustomerDetailPage() {
   const stats    = customer.stats
   const orders   = customer.recentOrders ?? []
   const locations: any[] = customer.locations ?? []
+  const allPics:  any[]  = customer.pics ?? []
   const rayonList = rayons ?? []
   const apiKey   = `/api/customers/${id}`
+
+  const activePics   = allPics.filter((p: any) => p.isActive)
+  const inactivePics = allPics.filter((p: any) => !p.isActive)
+  const visiblePics  = showAllPic ? allPics : activePics
 
   // ── Location handlers ──────────────────────────────────────────
   function openAddLoc() {
@@ -107,6 +121,50 @@ export default function CustomerDetailPage() {
     if (!res.ok) { toast({ title: 'Gagal menghapus', description: json.message, variant: 'destructive' }); return }
     mutate(apiKey)
     toast({ title: 'Lokasi dihapus', description: namaLokasi })
+  }
+
+  // ── PIC handlers ───────────────────────────────────────────────
+  function openAddPic() {
+    setEditPicId(null); setPicForm(emptyPICForm); setPicError(''); setPicOpen(true)
+  }
+
+  function openEditPic(pic: any) {
+    setEditPicId(pic.id)
+    setPicForm({ name: pic.name, phone: pic.phone ?? '', jabatan: pic.jabatan ?? '', isActive: pic.isActive, notes: pic.notes ?? '' })
+    setPicError(''); setPicOpen(true)
+  }
+
+  async function handleSavePic(e: React.FormEvent) {
+    e.preventDefault()
+    setPicSaving(true); setPicError('')
+    try {
+      const url    = editPicId ? `/api/customers/${id}/pics/${editPicId}` : `/api/customers/${id}/pics`
+      const method = editPicId ? 'PATCH' : 'POST'
+      const res    = await fetch(url, { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(picForm) })
+      const json   = await res.json()
+      if (!res.ok) { setPicError(json.message ?? 'Gagal menyimpan'); return }
+      setPicOpen(false); mutate(apiKey)
+      toast({ title: editPicId ? 'PIC diperbarui' : 'PIC ditambahkan', description: picForm.name })
+    } finally { setPicSaving(false) }
+  }
+
+  async function handleTogglePic(pic: any) {
+    const res  = await fetch(`/api/customers/${id}/pics/${pic.id}`, {
+      method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ isActive: !pic.isActive }),
+    })
+    if (!res.ok) { toast({ title: 'Gagal', variant: 'destructive' }); return }
+    mutate(apiKey)
+    toast({ title: pic.isActive ? 'PIC dinonaktifkan' : 'PIC diaktifkan kembali', description: pic.name })
+  }
+
+  async function handleDeletePic(pic: any) {
+    if (!confirm(`Hapus PIC "${pic.name}" dari riwayat?`)) return
+    const res  = await fetch(`/api/customers/${id}/pics/${pic.id}`, { method: 'DELETE' })
+    const json = await res.json()
+    if (!res.ok) { toast({ title: 'Gagal menghapus', description: json.message, variant: 'destructive' }); return }
+    mutate(apiKey)
+    toast({ title: 'PIC dihapus', description: pic.name })
   }
 
   async function handleSetDefault(locId: string) {
@@ -245,6 +303,75 @@ export default function CustomerDetailPage() {
         </CardContent>
       </Card>
 
+      {/* ── PIC (Person in Charge) ───────────────────────────────── */}
+      <Card>
+        <CardHeader className="pb-3 flex flex-row items-center justify-between">
+          <CardTitle className="text-base flex items-center gap-2">
+            <Users className="h-4 w-4" /> Person in Charge
+            <Badge variant="secondary" className="ml-1">{activePics.length} aktif</Badge>
+          </CardTitle>
+          <div className="flex items-center gap-2">
+            {inactivePics.length > 0 && (
+              <Button size="sm" variant="ghost" className="h-8 text-xs text-muted-foreground"
+                onClick={() => setShowAllPic(v => !v)}>
+                {showAllPic ? 'Sembunyikan nonaktif' : `+${inactivePics.length} nonaktif`}
+              </Button>
+            )}
+            {canManage && (
+              <Button size="sm" variant="outline" className="gap-1.5 h-8" onClick={openAddPic}>
+                <Plus className="h-3.5 w-3.5" /> Tambah PIC
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+        <CardContent className="p-0">
+          {visiblePics.length === 0 ? (
+            <p className="text-sm text-muted-foreground p-6">Belum ada PIC terdaftar.</p>
+          ) : (
+            <div className="divide-y">
+              {visiblePics.map((pic: any) => (
+                <div key={pic.id} className={`flex items-start justify-between px-6 py-3 gap-4 ${!pic.isActive ? 'opacity-50' : ''}`}>
+                  <div className="flex items-start gap-2 min-w-0">
+                    {pic.isActive
+                      ? <UserCheck className="h-4 w-4 text-emerald-500 mt-0.5 shrink-0" />
+                      : <UserX    className="h-4 w-4 text-muted-foreground mt-0.5 shrink-0" />
+                    }
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium text-sm">{pic.name}</p>
+                        {!pic.isActive && <Badge variant="outline" className="text-xs h-4 text-muted-foreground">nonaktif</Badge>}
+                      </div>
+                      {pic.jabatan && <p className="text-xs text-muted-foreground">{pic.jabatan}</p>}
+                      {pic.phone   && <p className="text-xs text-muted-foreground">{pic.phone}</p>}
+                      {pic.notes   && <p className="text-xs text-muted-foreground italic mt-0.5">{pic.notes}</p>}
+                    </div>
+                  </div>
+                  {canManage && (
+                    <div className="flex items-center gap-1 shrink-0">
+                      <Button variant="ghost" size="icon" className="h-7 w-7"
+                        title={pic.isActive ? 'Nonaktifkan' : 'Aktifkan kembali'}
+                        onClick={() => handleTogglePic(pic)}>
+                        {pic.isActive
+                          ? <UserX     className="h-3.5 w-3.5 text-muted-foreground" />
+                          : <UserCheck className="h-3.5 w-3.5 text-emerald-600" />
+                        }
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => openEditPic(pic)}>
+                        <Pencil className="h-3.5 w-3.5" />
+                      </Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive hover:text-destructive"
+                        onClick={() => handleDeletePic(pic)}>
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* ── Riwayat Pesanan ───────────────────────────────────────── */}
       <Card>
         <CardHeader className="pb-2">
@@ -289,6 +416,54 @@ export default function CustomerDetailPage() {
           )}
         </CardContent>
       </Card>
+
+      {/* ── Dialog Tambah / Edit PIC ──────────────────────────────── */}
+      <Dialog open={picOpen} onOpenChange={o => { setPicOpen(o); if (!o) setPicError('') }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>{editPicId ? 'Edit PIC' : 'Tambah PIC'}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSavePic} className="space-y-4">
+            <div className="space-y-1.5">
+              <Label>Nama <span className="text-destructive">*</span></Label>
+              <Input value={picForm.name} required
+                onChange={e => setPicForm(f => ({ ...f, name: e.target.value }))}
+                placeholder="Nama PIC" />
+            </div>
+            <div className="grid grid-cols-2 gap-3">
+              <div className="space-y-1.5">
+                <Label>No. HP</Label>
+                <Input value={picForm.phone}
+                  onChange={e => setPicForm(f => ({ ...f, phone: e.target.value }))}
+                  placeholder="08xx..." />
+              </div>
+              <div className="space-y-1.5">
+                <Label>Jabatan</Label>
+                <Input value={picForm.jabatan}
+                  onChange={e => setPicForm(f => ({ ...f, jabatan: e.target.value }))}
+                  placeholder="cth. Owner, Manager..." />
+              </div>
+            </div>
+            <div className="space-y-1.5">
+              <Label>Catatan</Label>
+              <Input value={picForm.notes}
+                onChange={e => setPicForm(f => ({ ...f, notes: e.target.value }))}
+                placeholder="Opsional..." />
+            </div>
+            <div className="flex items-center gap-2">
+              <input type="checkbox" id="picActive" checked={picForm.isActive}
+                onChange={e => setPicForm(f => ({ ...f, isActive: e.target.checked }))}
+                className="rounded" />
+              <Label htmlFor="picActive" className="cursor-pointer">PIC aktif saat ini</Label>
+            </div>
+            {picError && <p className="text-sm text-destructive">{picError}</p>}
+            <DialogFooter>
+              <Button type="button" variant="outline" onClick={() => setPicOpen(false)}>Batal</Button>
+              <Button type="submit" disabled={picSaving}>{picSaving ? 'Menyimpan...' : 'Simpan'}</Button>
+            </DialogFooter>
+          </form>
+        </DialogContent>
+      </Dialog>
 
       {/* ── Dialog Tambah / Edit Lokasi ───────────────────────────── */}
       <Dialog open={locOpen} onOpenChange={o => { setLocOpen(o); if (!o) setLocError('') }}>
