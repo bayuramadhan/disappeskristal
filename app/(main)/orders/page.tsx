@@ -124,10 +124,10 @@ function DraftCard({ draft, customers, today, onPublish, onDelete, isReviewing, 
               </SelectContent>
             </Select>
           </div>
-          {/* Location picker — hanya jika customer punya >1 lokasi */}
+          {/* Location picker — selalu tampil saat customer dipilih */}
           {(() => {
             const locs: any[] = customers.find((c: any) => c.id === form.customerId)?.locations ?? []
-            if (locs.length <= 1) return null
+            if (!form.customerId || locs.length === 0) return null
             return (
               <div className="space-y-1">
                 <Label className="text-xs">Lokasi Pengiriman <span className="text-destructive">*</span></Label>
@@ -473,11 +473,11 @@ export default function OrdersPage() {
                         </SelectContent>
                       </Select>
                     </div>
-                    {/* Location picker — tampil jika customer punya >1 lokasi */}
+                    {/* Location picker — selalu tampil saat customer dipilih */}
                     {(() => {
                       const selectedCustomer = (customers ?? []).find((c: any) => c.id === newOrderForm.customerId)
                       const locs: any[] = selectedCustomer?.locations ?? []
-                      if (locs.length <= 1) return null
+                      if (!newOrderForm.customerId || locs.length === 0) return null
                       return (
                         <div className="space-y-1.5">
                           <Label>Lokasi Pengiriman <span className="text-destructive">*</span></Label>
