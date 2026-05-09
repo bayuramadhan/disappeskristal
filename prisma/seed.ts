@@ -90,7 +90,12 @@ async function main() {
     'Warung Sedap',         'Toko Utama',            'Depot Jaya',         'Warung Rasa',
     'Toko Makmur',          'Warung Lezat',          'Depot Es Tebu',      'Toko Sentosa',
   ]
-  const types: ('WARUNG' | 'DEPOT' | 'TOKO')[] = ['WARUNG', 'DEPOT', 'TOKO']
+  function inferType(name: string): 'WARUNG' | 'DEPOT' | 'TOKO' {
+    const lower = name.toLowerCase()
+    if (lower.startsWith('warung')) return 'WARUNG'
+    if (lower.startsWith('depot'))  return 'DEPOT'
+    return 'TOKO'
+  }
 
   const customerRayons: { id: string; rayonId: string }[] = []
   const customers = await Promise.all(
@@ -100,12 +105,12 @@ async function main() {
         data: {
           name,
           phone:        `0813-${String(9000 + i).padStart(4, '0')}`,
-          customerType: types[i % 3],
+          customerType: inferType(name),
           defaultPrice: 15_000 + i * 500,
           activeStatus: true,
           locations: {
             create: {
-              namaLokasi: `Toko ${name}`,
+              namaLokasi: name,
               alamat:     `Jl. Raya ${rayon.name.split(' ')[1]} No. ${i + 1}`,
               rayonId:    rayon.id,
               gpsLat:     -6.2  + Math.random() * 0.1,
