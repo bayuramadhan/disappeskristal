@@ -23,7 +23,7 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     })
     if (!existing) return apiNotFound('Fleet status')
 
-    const { remainingLoad, departureTime, activeStatus } = parsed.data
+    const { remainingLoad, departureTime, activeStatus, rayonId, driverId, helperName } = parsed.data
 
     // Validate remainingLoad doesn't exceed initialLoad
     if (remainingLoad !== undefined && remainingLoad > existing.initialLoad) {
@@ -33,9 +33,12 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     const updated = await prisma.fleetDailyStatus.update({
       where: { id: params.id },
       data: {
-        ...(remainingLoad  !== undefined && { remainingLoad }),
-        ...(departureTime  !== undefined && { departureTime: new Date(departureTime) }),
-        ...(activeStatus   !== undefined && { activeStatus }),
+        ...(remainingLoad !== undefined && { remainingLoad }),
+        ...(departureTime !== undefined && { departureTime: new Date(departureTime) }),
+        ...(activeStatus  !== undefined && { activeStatus }),
+        ...(rayonId       !== undefined && { rayonId }),
+        ...(driverId      !== undefined && { driverId }),
+        ...(helperName    !== undefined && { helperName }),
       },
       include: {
         vehicle: { select: { id: true, plateNumber: true } },

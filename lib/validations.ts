@@ -184,6 +184,9 @@ export const updateFleetStatusSchema = z.object({
   remainingLoad: z.number().min(0).optional(),
   departureTime: z.string().optional(),
   activeStatus:  z.boolean().optional(),
+  rayonId:       z.string().optional(),
+  driverId:      z.string().optional(),
+  helperName:    z.string().optional(),
 })
 
 // ==================== TYPES ====================

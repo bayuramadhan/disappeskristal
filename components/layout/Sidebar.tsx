@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import {
   LayoutDashboard, ShoppingCart, Truck, Users, BarChart3,
-  Factory, ChevronLeft, ChevronRight, IceCream2, UserCheck, MapPin, Tag,
+  Factory, ChevronLeft, ChevronRight, IceCream2, MapPin, Tag,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useRole } from '@/hooks/useRole'
@@ -15,17 +15,15 @@ type NavItem = { href: string; label: string; icon: React.ElementType; roles: st
 const operationalNav: NavItem[] = [
   { href: '/dashboard',  label: 'Dashboard', icon: LayoutDashboard, roles: ['ADMIN', 'SUPERVISOR', 'OPERATOR'] },
   { href: '/orders',     label: 'Pesanan',   icon: ShoppingCart,    roles: ['ADMIN', 'SUPERVISOR', 'OPERATOR'] },
-  { href: '/fleet',      label: 'Armada',    icon: Truck,           roles: ['ADMIN', 'SUPERVISOR', 'OPERATOR'] },
+  { href: '/armada',     label: 'Armada',    icon: Truck,           roles: ['ADMIN', 'SUPERVISOR', 'OPERATOR'] },
   { href: '/finance',    label: 'Keuangan',  icon: BarChart3,       roles: ['ADMIN', 'SUPERVISOR'] },
   { href: '/production', label: 'Produksi',  icon: Factory,         roles: ['ADMIN', 'SUPERVISOR'] },
 ]
 
 const masterNav: NavItem[] = [
-  { href: '/customers',       label: 'Pelanggan', icon: Users,      roles: ['ADMIN', 'SUPERVISOR', 'OPERATOR'] },
-  { href: '/master/vehicles', label: 'Kendaraan', icon: Truck,      roles: ['ADMIN', 'SUPERVISOR'] },
-  { href: '/master/drivers',  label: 'Driver',    icon: UserCheck,  roles: ['ADMIN', 'SUPERVISOR'] },
-  { href: '/master/rayons',          label: 'Rayon',       icon: MapPin,     roles: ['ADMIN', 'SUPERVISOR'] },
-  { href: '/master/price-profiles',  label: 'Harga Jual',  icon: Tag,        roles: ['ADMIN', 'SUPERVISOR'] },
+  { href: '/customers',              label: 'Pelanggan', icon: Users,     roles: ['ADMIN', 'SUPERVISOR', 'OPERATOR'] },
+  { href: '/master/rayons',          label: 'Rayon',     icon: MapPin,    roles: ['ADMIN', 'SUPERVISOR'] },
+  { href: '/master/price-profiles',  label: 'Harga Jual',icon: Tag,       roles: ['ADMIN', 'SUPERVISOR'] },
 ]
 
 const roleLabel: Record<string, string> = {
