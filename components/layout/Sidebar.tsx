@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import {
   LayoutDashboard, ShoppingCart, Truck, Users, BarChart3,
-  Factory, ChevronLeft, ChevronRight, IceCream2, MapPin, Tag,
+  Factory, ChevronLeft, ChevronRight, IceCream2, MapPin, Tag, Settings2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useRole } from '@/hooks/useRole'
@@ -21,9 +21,10 @@ const operationalNav: NavItem[] = [
 ]
 
 const masterNav: NavItem[] = [
-  { href: '/customers',              label: 'Pelanggan', icon: Users,     roles: ['ADMIN', 'SUPERVISOR', 'OPERATOR'] },
-  { href: '/master/rayons',          label: 'Rayon',     icon: MapPin,    roles: ['ADMIN', 'SUPERVISOR'] },
-  { href: '/master/price-profiles',  label: 'Harga Jual',icon: Tag,       roles: ['ADMIN', 'SUPERVISOR'] },
+  { href: '/customers',             label: 'Pelanggan',  icon: Users,     roles: ['ADMIN', 'SUPERVISOR', 'OPERATOR'] },
+  { href: '/master/armada',         label: 'Armada',     icon: Settings2, roles: ['ADMIN', 'SUPERVISOR'] },
+  { href: '/master/rayons',         label: 'Rayon',      icon: MapPin,    roles: ['ADMIN', 'SUPERVISOR'] },
+  { href: '/master/price-profiles', label: 'Harga Jual', icon: Tag,       roles: ['ADMIN', 'SUPERVISOR'] },
 ]
 
 const roleLabel: Record<string, string> = {
