@@ -190,13 +190,7 @@ export default function OrdersPage() {
   const [draftOpen, setDraftOpen]         = useState(false)
   const [draftReviewId, setDraftReviewId] = useState<string | null>(null)
 
-  // Delivery log form
-  const [deliveryOpen, setDeliveryOpen]   = useState(false)
-  const [deliveryTarget, setDeliveryTarget] = useState<any>(null)
-  const [deliveryForm, setDeliveryForm]   = useState({ vehicleId: '', driverId: '', deliveredQty: '', returnedQty: '0', returnReason: '' })
-  const [deliveryLoading, setDeliveryLoading] = useState(false)
-
-  const { canWrite, isAdmin } = useRole()
+const { canWrite, isAdmin } = useRole()
   const { data, isLoading } = useOrders({ ...filters, limit: 20 })
   const { data: customers }  = useCustomers({ limit: 200 } as any)
   const { data: waDrafts, mutate: mutateDrafts } = useSWR<any[]>('/api/wa-drafts', fetcher)
@@ -320,44 +314,6 @@ export default function OrdersPage() {
       toast({ title: `Pesanan ${status === 'CONFIRMED' ? 'dikonfirmasi' : 'dibatalkan'}` })
     } finally {
       setActionLoading(false)
-    }
-  }
-
-  // ── Armada aktif hari ini (untuk form delivery log) ──────────────────────
-  const { data: activeFleet } = useSWR(
-    deliveryOpen ? `/api/fleet?date=${filters.date}` : null,
-    fetcher,
-  )
-
-  // ── Submit delivery log ───────────────────────────────────────────────────
-  async function submitDeliveryLog(e: React.FormEvent) {
-    e.preventDefault()
-    if (!deliveryTarget) return
-    setDeliveryLoading(true)
-    try {
-      const res = await fetch('/api/delivery-logs', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          orderId:      deliveryTarget.id,
-          vehicleId:    deliveryForm.vehicleId,
-          driverId:     deliveryForm.driverId,
-          deliveredQty: Number(deliveryForm.deliveredQty),
-          returnedQty:  Number(deliveryForm.returnedQty),
-          returnReason: deliveryForm.returnReason || undefined,
-        }),
-      })
-      const json = await res.json()
-      if (!res.ok) {
-        toast({ title: 'Gagal mencatat pengiriman', description: json.message, variant: 'destructive' })
-        return
-      }
-      setDeliveryOpen(false)
-      globalMutate(key => typeof key === 'string' && key.startsWith('/api/orders'))
-      selectedOrderDetail.mutate()
-      toast({ title: 'Pengiriman tercatat', description: `Status diperbarui ke ${json.data?.orderStatusUpdatedTo ?? ''}` })
-    } finally {
-      setDeliveryLoading(false)
     }
   }
 
@@ -653,105 +609,6 @@ export default function OrdersPage() {
         </div>
       )}
 
-      {/* Dialog Catat Pengiriman */}
-      <Dialog open={deliveryOpen} onOpenChange={setDeliveryOpen}>
-        <DialogContent className="max-w-sm">
-          <DialogHeader>
-            <DialogTitle>{deliveryTarget?.status === 'PARTIAL' ? 'Catat Pengiriman Lanjutan' : 'Catat Pengiriman'}</DialogTitle>
-            <p className="text-sm text-muted-foreground">
-              {deliveryTarget?.customer?.name} — {deliveryTarget?.orderedQty} sak dipesan
-              {deliveryTarget?.status === 'PARTIAL' && (
-                <span className="text-amber-600 ml-1">(sisa {deliveryTarget.orderedQty - (deliveryTarget.deliveredQty ?? 0)} sak belum terkirim)</span>
-              )}
-            </p>
-          </DialogHeader>
-          <form onSubmit={submitDeliveryLog} className="space-y-4">
-            <div className="space-y-1.5">
-              <Label>Armada <span className="text-destructive">*</span></Label>
-              {(() => {
-                const matchedFleet = (activeFleet ?? []).filter((f: any) =>
-                  !deliveryTarget?.rayonId || f.rayonId === deliveryTarget.rayonId
-                )
-                return (
-                  <>
-                    <Select value={deliveryForm.vehicleId} onValueChange={v => {
-                      const fleet = (activeFleet ?? []).find((f: any) => f.vehicleId === v)
-                      setDeliveryForm(f => ({ ...f, vehicleId: v, driverId: fleet?.driverId ?? '' }))
-                    }}>
-                      <SelectTrigger><SelectValue placeholder="Pilih kendaraan aktif..." /></SelectTrigger>
-                      <SelectContent>
-                        {matchedFleet.map((f: any) => (
-                          <SelectItem key={f.vehicleId} value={f.vehicleId}>
-                            {f.vehicle?.plateNumber} — {f.driver?.name} (sisa {f.remainingLoad} sak)
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                    {deliveryForm.vehicleId && (() => {
-                      const sel = (activeFleet ?? []).find((f: any) => f.vehicleId === deliveryForm.vehicleId)
-                      return sel ? (
-                        <p className="text-xs text-muted-foreground">Sisa muatan: <span className="font-medium">{sel.remainingLoad} sak</span></p>
-                      ) : null
-                    })()}
-                    {matchedFleet.length === 0 && (
-                      <p className="text-xs text-amber-600">
-                        Tidak ada armada aktif untuk rayon ini hari ini
-                      </p>
-                    )}
-                  </>
-                )
-              })()}
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Terkirim (sak) <span className="text-destructive">*</span></Label>
-                <Input
-                  type="number" min={0}
-                  max={Math.min(
-                    deliveryTarget?.orderedQty ?? Infinity,
-                    (activeFleet ?? []).find((f: any) => f.vehicleId === deliveryForm.vehicleId)?.remainingLoad ?? Infinity,
-                  )}
-                  value={deliveryForm.deliveredQty}
-                  onChange={e => setDeliveryForm(f => ({ ...f, deliveredQty: e.target.value }))}
-                  placeholder="0" required
-                />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Retur (sak)</Label>
-                <Input
-                  type="number" min={0}
-                  value={deliveryForm.returnedQty}
-                  onChange={e => setDeliveryForm(f => ({ ...f, returnedQty: e.target.value }))}
-                  placeholder="0"
-                />
-              </div>
-            </div>
-            {Number(deliveryForm.returnedQty) > 0 && (
-              <div className="space-y-1.5">
-                <Label>Alasan Retur <span className="text-muted-foreground text-xs">(opsional)</span></Label>
-                <Select value={deliveryForm.returnReason} onValueChange={v => setDeliveryForm(f => ({ ...f, returnReason: v }))}>
-                  <SelectTrigger><SelectValue placeholder="Pilih alasan..." /></SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="WEATHER">Cuaca</SelectItem>
-                    <SelectItem value="CUSTOMER_CLOSED">Pelanggan tutup</SelectItem>
-                    <SelectItem value="ALREADY_BOUGHT">Sudah beli di tempat lain</SelectItem>
-                    <SelectItem value="LATE_DELIVERY">Pengiriman terlambat</SelectItem>
-                    <SelectItem value="REDUCED_NEED">Kebutuhan berkurang</SelectItem>
-                    <SelectItem value="OTHER">Lainnya</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            <DialogFooter>
-              <Button type="button" variant="outline" onClick={() => setDeliveryOpen(false)}>Batal</Button>
-              <Button type="submit" disabled={deliveryLoading || !deliveryForm.vehicleId || deliveryForm.deliveredQty === ''}>
-                {deliveryLoading ? 'Menyimpan...' : 'Simpan'}
-              </Button>
-            </DialogFooter>
-          </form>
-        </DialogContent>
-      </Dialog>
-
       {/* Draft WA Queue */}
       <Dialog open={draftOpen} onOpenChange={setDraftOpen}>
         <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto">
@@ -853,38 +710,12 @@ export default function OrdersPage() {
                       if (isFinal) return null
                       return (
                         <div className="border-t pt-4 space-y-2">
-                          {['CONFIRMED', 'ASSIGNED', 'LOADED', 'PARTIAL'].includes(o.status) && canWrite && (
-                            <Button
-                              size="sm" className="w-full"
-                              onClick={() => {
-                                const sisaQty = o.orderedQty - (o.deliveredQty ?? 0)
-                                setDeliveryTarget(o)
-                                setDeliveryForm({
-                                  vehicleId: o.vehicleId ?? '',
-                                  driverId: '',
-                                  deliveredQty: String(sisaQty > 0 ? sisaQty : o.orderedQty),
-                                  returnedQty: '0',
-                                  returnReason: '',
-                                })
-                                setDeliveryOpen(true)
-                              }}
-                            >
-                              {o.status === 'PARTIAL' ? 'Catat Pengiriman Lanjutan' : 'Catat Pengiriman'}
-                            </Button>
+                          {['CONFIRMED', 'ASSIGNED', 'LOADED', 'PARTIAL'].includes(o.status) && (
+                            <p className="text-xs text-muted-foreground text-center">
+                              Pencatatan pengiriman dilakukan di menu <span className="font-medium">Pengiriman</span>.
+                            </p>
                           )}
                           <div className="flex gap-2">
-                          {o.status === 'PARTIAL' && canWrite && (
-                            <Button
-                              size="sm" variant="outline" className="flex-1"
-                              disabled={actionLoading}
-                              onClick={() => {
-                                if (confirm(`Selesaikan pesanan ini sebagai terkirim? Order akan ditutup dengan ${o.deliveredQty ?? 0} sak terkirim dari ${o.orderedQty} sak yang dipesan.`))
-                                  updateOrderStatus(o.id, 'DELIVERED')
-                              }}
-                            >
-                              Selesaikan
-                            </Button>
-                          )}
                           {o.status === 'CREATED' && canWrite && (
                             <Button
                               size="sm" className="flex-1"

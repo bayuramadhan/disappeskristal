@@ -40,8 +40,13 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
   const [assigning, setAssigning]       = useState<string | null>(null)
 
   // Dialog qty input untuk assign
-  const [qtyTarget, setQtyTarget]       = useState<any>(null)   // order yang dipilih
+  const [qtyTarget, setQtyTarget]       = useState<any>(null)
   const [qtyValue, setQtyValue]         = useState('')
+
+  // Dialog catat pengiriman
+  const [delivTarget, setDelivTarget]   = useState<any>(null)
+  const [delivForm, setDelivForm]       = useState({ deliveredQty: '', returnedQty: '0', returnReason: '' })
+  const [delivLoading, setDelivLoading] = useState(false)
 
   const rayonId    = armada?.rayonId
   const rayonParam = (!showAllRayon && rayonId) ? `&rayonId=${rayonId}` : ''
@@ -84,6 +89,38 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
       onRefresh()
       toast({ title: `${qty} sak dimasukkan ke armada`, description: json.data?.customer?.name })
     } finally { setAssigning(null) }
+  }
+
+  function openDelivery(order: any) {
+    const sisaQty = order.orderedQty - (order.deliveredQty ?? 0)
+    const defaultDelivered = Math.min(order.assignedQty ?? order.orderedQty, sisaQty > 0 ? sisaQty : order.orderedQty)
+    setDelivTarget(order)
+    setDelivForm({ deliveredQty: String(defaultDelivered), returnedQty: '0', returnReason: '' })
+  }
+
+  async function submitDelivery(e: React.FormEvent) {
+    e.preventDefault()
+    if (!delivTarget) return
+    setDelivLoading(true)
+    try {
+      const res  = await fetch('/api/delivery-logs', {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          orderId:      delivTarget.id,
+          vehicleId:    armada.vehicleId,
+          driverId:     armada.driverId,
+          deliveredQty: Number(delivForm.deliveredQty),
+          returnedQty:  Number(delivForm.returnedQty),
+          returnReason: delivForm.returnReason || undefined,
+        }),
+      })
+      const json = await res.json()
+      if (!res.ok) { toast({ title: 'Gagal mencatat', description: json.message, variant: 'destructive' }); return }
+      setDelivTarget(null)
+      onRefresh()
+      toast({ title: 'Pengiriman tercatat', description: `Status → ${json.data?.orderStatusUpdatedTo ?? ''}` })
+    } finally { setDelivLoading(false) }
   }
 
   async function unassign(order: any) {
@@ -166,10 +203,16 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
                   </p>
                 </div>
                 {canWrite && !['DELIVERED', 'CANCELLED', 'REJECTED', 'RETURNED'].includes(o.status) && (
-                  <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
-                    disabled={assigning === o.id} onClick={() => unassign(o)}>
-                    <X className="h-3.5 w-3.5" />
-                  </Button>
+                  <div className="flex flex-col gap-1 shrink-0">
+                    <Button size="sm" variant="default" className="h-7 text-xs px-2"
+                      onClick={() => openDelivery(o)}>
+                      Catat
+                    </Button>
+                    <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                      disabled={assigning === o.id} onClick={() => unassign(o)}>
+                      <X className="h-3.5 w-3.5" />
+                    </Button>
+                  </div>
                 )}
               </div>
             ))
@@ -184,6 +227,79 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
             </Button>
           </div>
         )}
+
+        {/* Dialog Catat Pengiriman ─────────────────────────────────── */}
+        <Dialog open={!!delivTarget} onOpenChange={o => { if (!o) setDelivTarget(null) }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>
+                {delivTarget?.status === 'PARTIAL' ? 'Catat Pengiriman Lanjutan' : 'Catat Pengiriman'}
+              </DialogTitle>
+              <div className="text-sm text-muted-foreground space-y-0.5">
+                <p className="font-medium text-foreground">{delivTarget?.customer?.name}</p>
+                <p>
+                  {delivTarget?.assignedQty ?? delivTarget?.orderedQty} sak dialokasikan ke armada ini
+                  {delivTarget?.isSplit && (
+                    <span className="ml-1 text-amber-600">(dari {delivTarget?.orderedQty} sak total)</span>
+                  )}
+                </p>
+                {(delivTarget?.deliveredQty ?? 0) > 0 && (
+                  <p className="text-emerald-600">Sudah terkirim sebelumnya: {delivTarget.deliveredQty} sak</p>
+                )}
+              </div>
+            </DialogHeader>
+            <form onSubmit={submitDelivery} className="space-y-4">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Terkirim (sak) <span className="text-destructive">*</span></Label>
+                  <Input
+                    type="number" min={0}
+                    max={delivTarget ? delivTarget.orderedQty - (delivTarget.deliveredQty ?? 0) : undefined}
+                    value={delivForm.deliveredQty}
+                    onChange={e => {
+                      const terkirim = Number(e.target.value)
+                      const assignedQty = delivTarget?.assignedQty ?? delivTarget?.orderedQty ?? 0
+                      const retur = Math.max(0, assignedQty - terkirim)
+                      setDelivForm(f => ({ ...f, deliveredQty: e.target.value, returnedQty: String(retur) }))
+                    }}
+                    placeholder="0" required autoFocus
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Retur (sak)</Label>
+                  <Input
+                    type="number" min={0}
+                    value={delivForm.returnedQty}
+                    onChange={e => setDelivForm(f => ({ ...f, returnedQty: e.target.value }))}
+                    placeholder="0"
+                  />
+                </div>
+              </div>
+              {Number(delivForm.returnedQty) > 0 && (
+                <div className="space-y-1.5">
+                  <Label>Alasan Retur</Label>
+                  <Select value={delivForm.returnReason} onValueChange={v => setDelivForm(f => ({ ...f, returnReason: v }))}>
+                    <SelectTrigger><SelectValue placeholder="Pilih alasan..." /></SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="WEATHER">Cuaca</SelectItem>
+                      <SelectItem value="CUSTOMER_CLOSED">Pelanggan tutup</SelectItem>
+                      <SelectItem value="ALREADY_BOUGHT">Sudah beli di tempat lain</SelectItem>
+                      <SelectItem value="LATE_DELIVERY">Pengiriman terlambat</SelectItem>
+                      <SelectItem value="REDUCED_NEED">Kebutuhan berkurang</SelectItem>
+                      <SelectItem value="OTHER">Lainnya</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
+              <DialogFooter>
+                <Button type="button" variant="outline" onClick={() => setDelivTarget(null)}>Batal</Button>
+                <Button type="submit" disabled={delivLoading || delivForm.deliveredQty === ''}>
+                  {delivLoading ? 'Menyimpan...' : 'Simpan'}
+                </Button>
+              </DialogFooter>
+            </form>
+          </DialogContent>
+        </Dialog>
 
         {/* Dialog konfirmasi qty ────────────────────────────────────── */}
         <Dialog open={!!qtyTarget} onOpenChange={o => { if (!o) setQtyTarget(null) }}>
