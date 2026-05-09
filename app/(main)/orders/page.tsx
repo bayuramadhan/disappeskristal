@@ -144,7 +144,7 @@ export default function OrdersPage() {
   const pendingOrderId = useRef<string | null>(null)
   const [newOrderOpen, setNewOrderOpen]   = useState(false)
   const [newOrderForm, setNewOrderForm]   = useState({
-    customerId: '', orderChannel: 'PREORDER', deliveryDate: today,
+    customerId: '', deliveryLocationId: '', orderChannel: 'PREORDER', deliveryDate: today,
     orderedQty: '', pricePerUnit: '', notes: '',
   })
   const [submitting, setSubmitting]       = useState(false)
@@ -185,13 +185,26 @@ export default function OrdersPage() {
     }
   }, [data, isLoading])
 
-  // Auto-lookup harga dari PriceProfile
+  // Auto-set deliveryLocationId ke default location saat customer berubah
   useEffect(() => {
-    const { customerId, orderChannel, deliveryDate } = newOrderForm
+    const customer = (customers ?? []).find((c: any) => c.id === newOrderForm.customerId)
+    const defaultLoc = customer?.locations?.find((l: any) => l.isDefault) ?? customer?.locations?.[0]
+    setNewOrderForm(f => ({ ...f, deliveryLocationId: defaultLoc?.id ?? '' }))
+  }, [newOrderForm.customerId, customers])
+
+  // Auto-lookup harga dari PriceProfile (gunakan rayonId dari lokasi yang dipilih)
+  useEffect(() => {
+    const { customerId, deliveryLocationId, orderChannel, deliveryDate } = newOrderForm
     if (!customerId || !orderChannel || !deliveryDate) { setPriceHint(null); return }
 
     const customer = (customers ?? []).find((c: any) => c.id === customerId)
     if (!customer) { setPriceHint(null); return }
+
+    // Ambil rayonId dari lokasi yang dipilih, fallback ke lokasi default
+    const selectedLoc  = customer.locations?.find((l: any) => l.id === deliveryLocationId)
+      ?? customer.locations?.find((l: any) => l.isDefault)
+      ?? customer.locations?.[0]
+    const locationRayonId = selectedLoc?.rayonId ?? null
 
     const params = new URLSearchParams({ customerType: customer.customerType, channel: orderChannel })
 
@@ -200,14 +213,11 @@ export default function OrdersPage() {
       .then(json => {
         const profiles: any[] = json.data ?? []
         const date = new Date(deliveryDate)
-
-        // Filter yang berlaku di tanggal pengiriman
         const valid = profiles.filter(p =>
           new Date(p.validFrom) <= date && date <= new Date(p.validUntil)
         )
-
-        // Prefer rayon spesifik, fallback ke null (semua rayon)
-        const match = valid.find(p => p.rayonId === customer.rayonId)
+        // Prefer rayon spesifik lokasi, fallback ke null (semua rayon)
+        const match = valid.find(p => p.rayonId === locationRayonId)
           ?? valid.find(p => p.rayonId === null)
 
         if (match) {
@@ -218,7 +228,7 @@ export default function OrdersPage() {
         }
       })
       .catch(() => setPriceHint(null))
-  }, [newOrderForm.customerId, newOrderForm.orderChannel, newOrderForm.deliveryDate, customers])
+  }, [newOrderForm.customerId, newOrderForm.deliveryLocationId, newOrderForm.orderChannel, newOrderForm.deliveryDate, customers])
 
   const selectedOrderDetail  = useSWR(selectedOrder ? `/api/orders/${selectedOrder.id}` : null, fetcher)
 
@@ -235,6 +245,7 @@ export default function OrdersPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...newOrderForm,
+          deliveryLocationId: newOrderForm.deliveryLocationId || undefined,
           orderedQty:   Number(newOrderForm.orderedQty),
           pricePerUnit: Number(newOrderForm.pricePerUnit),
         }),
@@ -242,7 +253,7 @@ export default function OrdersPage() {
       if (res.ok) {
         setNewOrderOpen(false)
         globalMutate(key => typeof key === 'string' && key.startsWith('/api/orders'))
-        setNewOrderForm({ customerId: '', orderChannel: 'PREORDER', deliveryDate: today, orderedQty: '', pricePerUnit: '', notes: '' })
+        setNewOrderForm({ customerId: '', deliveryLocationId: '', orderChannel: 'PREORDER', deliveryDate: today, orderedQty: '', pricePerUnit: '', notes: '' })
         setPriceHint(null)
         toast({ title: 'Pesanan berhasil dibuat', variant: 'success' })
       } else {
@@ -424,6 +435,28 @@ export default function OrdersPage() {
                         </SelectContent>
                       </Select>
                     </div>
+                    {/* Location picker — tampil jika customer punya >1 lokasi */}
+                    {(() => {
+                      const selectedCustomer = (customers ?? []).find((c: any) => c.id === newOrderForm.customerId)
+                      const locs: any[] = selectedCustomer?.locations ?? []
+                      if (locs.length <= 1) return null
+                      return (
+                        <div className="space-y-1.5">
+                          <Label>Lokasi Pengiriman <span className="text-destructive">*</span></Label>
+                          <Select value={newOrderForm.deliveryLocationId}
+                            onValueChange={v => setNewOrderForm(f => ({ ...f, deliveryLocationId: v }))}>
+                            <SelectTrigger><SelectValue placeholder="Pilih lokasi..." /></SelectTrigger>
+                            <SelectContent>
+                              {locs.map((l: any) => (
+                                <SelectItem key={l.id} value={l.id}>
+                                  {l.namaLokasi}{l.isDefault ? ' ★' : ''}{l.rayon ? ` — ${l.rayon.name}` : ''}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                      )
+                    })()}
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
                         <Label>Channel <span className="text-destructive">*</span></Label>
@@ -544,7 +577,14 @@ export default function OrdersPage() {
                 {orders.map((order: any) => (
                   <TableRow key={order.id} className="cursor-pointer" onClick={() => setSelectedOrder(order)}>
                     <TableCell className="font-mono text-xs">{order.orderNumber}</TableCell>
-                    <TableCell className="font-medium text-sm">{order.customer?.name ?? '-'}</TableCell>
+                    <TableCell>
+                      <div>
+                        <p className="font-medium text-sm">{order.customer?.name ?? '-'}</p>
+                        {order.deliveryLocation && (
+                          <p className="text-xs text-muted-foreground">{order.deliveryLocation.namaLokasi}</p>
+                        )}
+                      </div>
+                    </TableCell>
                     <TableCell><ChannelTag channel={order.orderChannel} /></TableCell>
                     <TableCell className="text-sm">{order.deliveryDate ? format(new Date(order.deliveryDate), 'dd/MM/yyyy') : '-'}</TableCell>
                     <TableCell className="text-right text-sm">{order.orderedQty}</TableCell>
@@ -720,6 +760,9 @@ export default function OrdersPage() {
                         <p className="font-mono text-xs text-muted-foreground">{o.orderNumber}</p>
                         <p className="font-semibold text-lg mt-0.5">{o.customer?.name}</p>
                         <p className="text-sm text-muted-foreground">{o.customer?.customerType} — {o.rayon?.name ?? 'No Rayon'}</p>
+                        {o.deliveryLocation && (
+                          <p className="text-xs text-muted-foreground mt-0.5">📍 {o.deliveryLocation.namaLokasi}{o.deliveryLocation.alamat ? ` · ${o.deliveryLocation.alamat}` : ''}</p>
+                        )}
                       </div>
                       <StatusBadge status={o.status} />
                     </div>
