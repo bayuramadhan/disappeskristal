@@ -15,12 +15,13 @@ export async function GET(_req: NextRequest, { params }: Params) {
     const rayon = await prisma.rayon.findFirst({
       where: { id: params.id, deletedAt: null },
       include: {
-        customers: {
+        customerLocations: {
           where:   { deletedAt: null, activeStatus: true },
-          select:  { id: true, name: true, phone: true, customerType: true },
-          orderBy: { name: 'asc' },
+          select:  { id: true, namaLokasi: true, alamat: true,
+                     customer: { select: { id: true, name: true, phone: true, customerType: true } } },
+          orderBy: { namaLokasi: 'asc' },
         },
-        _count: { select: { customers: true, orders: true } },
+        _count: { select: { customerLocations: true, orders: true } },
       },
     })
     if (!rayon) return apiNotFound('Rayon')
@@ -69,11 +70,11 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
   try {
     const existing = await prisma.rayon.findFirst({
       where: { id: params.id, deletedAt: null },
-      include: { _count: { select: { customers: true, orders: true } } },
+      include: { _count: { select: { customerLocations: true, orders: true } } },
     })
     if (!existing) return apiNotFound('Rayon')
 
-    if (existing._count.customers > 0 || existing._count.orders > 0) {
+    if (existing._count.customerLocations > 0 || existing._count.orders > 0) {
       return apiError('Rayon tidak dapat dihapus karena masih memiliki pelanggan atau order', 409)
     }
 

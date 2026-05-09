@@ -92,25 +92,35 @@ async function main() {
   ]
   const types: ('WARUNG' | 'DEPOT' | 'TOKO')[] = ['WARUNG', 'DEPOT', 'TOKO']
 
+  const customerRayons: { id: string; rayonId: string }[] = []
   const customers = await Promise.all(
-    customerNames.map((name, i) => {
+    customerNames.map(async (name, i) => {
       const rayon = rayons[i % rayons.length]
-      return prisma.customer.create({
+      const customer = await prisma.customer.create({
         data: {
           name,
           phone:        `0813-${String(9000 + i).padStart(4, '0')}`,
-          address:      `Jl. Raya ${rayon.name.split(' ')[1]} No. ${i + 1}`,
-          rayonId:      rayon.id,
           customerType: types[i % 3],
           defaultPrice: 15_000 + i * 500,
-          gpsLat:       -6.2  + Math.random() * 0.1,
-          gpsLng:       106.8 + Math.random() * 0.1,
           activeStatus: true,
+          locations: {
+            create: {
+              namaLokasi: `Toko ${name}`,
+              alamat:     `Jl. Raya ${rayon.name.split(' ')[1]} No. ${i + 1}`,
+              rayonId:    rayon.id,
+              gpsLat:     -6.2  + Math.random() * 0.1,
+              gpsLng:     106.8 + Math.random() * 0.1,
+              isDefault:  true,
+              activeStatus: true,
+            },
+          },
         },
       })
+      customerRayons.push({ id: customer.id, rayonId: rayon.id })
+      return customer
     })
   )
-  console.log(`✅ Created ${customers.length} customers`)
+  console.log(`✅ Created ${customers.length} customers with default locations`)
 
   // ── ORDER + DELIVERY LOG (50) ─────────────────────────────────────────────
   const channels:      ('PREORDER' | 'HOTLINE' | 'CANVAS' | 'ADMIN_INPUT')[]                    = ['PREORDER', 'HOTLINE', 'CANVAS', 'ADMIN_INPUT']
@@ -122,7 +132,9 @@ async function main() {
   for (let i = 0; i < 50; i++) {
     const customer     = customers[i % customers.length]
     const vehicle      = vehicles[i % vehicles.length]
-    const rayon        = rayons[customer.rayonId ? rayons.findIndex(r => r.id === customer.rayonId) : i % rayons.length]
+    const custRayonId  = customerRayons.find(cr => cr.id === customer.id)?.rayonId
+    const rayonIdx     = custRayonId ? rayons.findIndex(r => r.id === custRayonId) : i % rayons.length
+    const rayon        = rayons[rayonIdx >= 0 ? rayonIdx : i % rayons.length]
     const driver       = drivers[i % drivers.length]
     const deliveryDate = daysAgo(rand(0, 29))
     const orderedQty   = rand(10, 60)

@@ -4,7 +4,7 @@ WORKDIR /app
 RUN apk add --no-cache openssl
 
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm ci --ignore-scripts
 
 # ── Stage 2: Build ─────────────────────────────────────────────
 FROM node:20-alpine AS builder
@@ -23,6 +23,7 @@ ENV SKIP_ENV_VALIDATION=1
 
 # Dummy env agar build tidak gagal karena env kosong
 ENV DATABASE_URL="postgresql://x:x@localhost/x"
+ENV DIRECT_URL="postgresql://x:x@localhost/x"
 ENV NEXTAUTH_SECRET="build-placeholder"
 ENV NEXTAUTH_URL="http://localhost:3000"
 

@@ -10,7 +10,7 @@ export async function GET() {
   try {
     const drafts = await prisma.waDraft.findMany({
       orderBy: { createdAt: 'desc' },
-      include: { customer: { select: { id: true, name: true, customerType: true, rayonId: true } } },
+      include: { customer: { select: { id: true, name: true, customerType: true } } },
     })
     return apiSuccess(drafts)
   } catch (err) {

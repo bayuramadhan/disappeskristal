@@ -86,4 +86,4 @@ ALTER TABLE "Customer" DROP COLUMN IF EXISTS "address";
 ALTER TABLE "Customer" DROP COLUMN IF EXISTS "rayonId";
 ALTER TABLE "Customer" DROP COLUMN IF EXISTS "gpsLat";
 ALTER TABLE "Customer" DROP COLUMN IF EXISTS "gpsLng";
-ALTER TABLE "Customer" DROP INDEX IF EXISTS "Customer_rayonId_idx";
+DROP INDEX IF EXISTS "Customer_rayonId_idx";

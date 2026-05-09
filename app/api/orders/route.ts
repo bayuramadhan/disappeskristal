@@ -44,10 +44,11 @@ export async function GET(req: NextRequest) {
         take:    limit,
         orderBy: [{ deliveryDate: 'desc' }, { createdAt: 'desc' }],
         include: {
-          customer: { select: { id: true, name: true, phone: true, customerType: true } },
-          vehicle:  { select: { id: true, plateNumber: true } },
-          rayon:    { select: { id: true, name: true } },
-          _count:   { select: { deliveryLogs: true } },
+          customer:         { select: { id: true, name: true, phone: true, customerType: true } },
+          deliveryLocation: { select: { id: true, namaLokasi: true, alamat: true } },
+          vehicle:          { select: { id: true, plateNumber: true } },
+          rayon:            { select: { id: true, name: true } },
+          _count:           { select: { deliveryLogs: true } },
         },
       }),
       prisma.order.count({ where }),
@@ -74,16 +75,15 @@ export async function POST(req: NextRequest) {
     const { customerId, vehicleId, rayonId, orderChannel, orderType,
             orderedQty, pricePerUnit, deliveryDate, notes } = parsed.data
 
-    // Auto-resolve rayonId from customer if not provided
-    let resolvedRayonId = rayonId
-    if (!resolvedRayonId) {
-      const customer = await prisma.customer.findUnique({
-        where: { id: customerId },
-        select: { rayonId: true },
-      })
-      if (!customer) return apiError('Customer tidak ditemukan', 404)
-      resolvedRayonId = customer.rayonId ?? undefined
-    }
+    // Resolve deliveryLocationId + rayonId dari default location customer
+    const defaultLocation = await prisma.customerLocation.findFirst({
+      where:   { customerId, deletedAt: null, isDefault: true },
+      select:  { id: true, rayonId: true },
+    })
+    if (!defaultLocation) return apiError('Customer atau lokasi default tidak ditemukan', 404)
+
+    const resolvedRayonId       = rayonId ?? defaultLocation.rayonId ?? undefined
+    const resolvedLocationId    = defaultLocation.id
 
     // Generate orderNumber: ORD-YYYYMMDD-XXX
     const dateStr    = new Date(deliveryDate).toISOString().slice(0, 10).replace(/-/g, '')
@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
       data: {
         orderNumber,
         customerId,
+        deliveryLocationId: resolvedLocationId,
         vehicleId:    vehicleId ?? null,
         rayonId:      resolvedRayonId ?? null,
         orderChannel: orderChannel as any,
@@ -106,9 +107,10 @@ export async function POST(req: NextRequest) {
         notes:        notes ?? null,
       },
       include: {
-        customer: { select: { id: true, name: true, phone: true } },
-        vehicle:  { select: { id: true, plateNumber: true } },
-        rayon:    { select: { id: true, name: true } },
+        customer:         { select: { id: true, name: true, phone: true } },
+        deliveryLocation: { select: { id: true, namaLokasi: true, alamat: true } },
+        vehicle:          { select: { id: true, plateNumber: true } },
+        rayon:            { select: { id: true, name: true } },
       },
     })
 

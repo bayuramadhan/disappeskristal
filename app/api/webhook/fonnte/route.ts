@@ -135,32 +135,43 @@ export async function POST(req: NextRequest) {
     console.log('Parsed:', parsed)
 
     // ── Customer lookup: sender phone number first (paling reliable), lalu nama ──
+    const customerInclude = {
+      locations: {
+        where:   { isDefault: true, deletedAt: null as null },
+        take:    1,
+        select:  { id: true, rayonId: true, namaLokasi: true },
+      },
+    }
+
     let customer = null
 
     if (sender) {
       const normalized = normalizePhone(String(sender))
       customer = await prisma.customer.findFirst({
         where:   { phone: { contains: normalized.slice(-8) } }, // 8 digit akhir
-        include: { rayon: true },
+        include: customerInclude,
       })
     }
 
     if (!customer && parsed.customerName) {
       customer = await prisma.customer.findFirst({
         where:   { name: { contains: parsed.customerName, mode: 'insensitive' } },
-        include: { rayon: true },
+        include: customerInclude,
       })
     }
 
     // ── Auto-create order jika semua data lengkap ─────────────────────────────
     if (customer && parsed.orderedQty) {
+      const defaultLocation = customer.locations[0]
+      const customerRayonId = defaultLocation?.rayonId ?? null
+
       const priceProfiles = await prisma.priceProfile.findMany({
         where: {
           customerType: customer.customerType,
           channel:      'HOTLINE',
           validFrom:    { lte: new Date(parsed.deliveryDate) },
           validUntil:   { gte: new Date(parsed.deliveryDate) },
-          OR: [{ rayonId: customer.rayonId }, { rayonId: null }],
+          OR: [{ rayonId: customerRayonId }, { rayonId: null }],
         },
         orderBy: { rayonId: 'desc' },
       })
@@ -174,13 +185,15 @@ export async function POST(req: NextRequest) {
         const order = await prisma.order.create({
           data: {
             orderNumber,
-            customerId:   customer.id,
-            orderChannel: 'HOTLINE',
-            deliveryDate: new Date(parsed.deliveryDate),
-            orderedQty:   parsed.orderedQty,
-            pricePerUnit: priceProfile.price,
-            notes:        parsed.notes,
-            status:       'CREATED',
+            customerId:         customer.id,
+            deliveryLocationId: defaultLocation?.id ?? null,
+            rayonId:            customerRayonId,
+            orderChannel:       'HOTLINE',
+            deliveryDate:       new Date(parsed.deliveryDate),
+            orderedQty:         parsed.orderedQty,
+            pricePerUnit:       priceProfile.price,
+            notes:              parsed.notes,
+            status:             'CREATED',
           },
         })
 

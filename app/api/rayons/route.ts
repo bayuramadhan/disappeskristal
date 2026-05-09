@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
         take:    limit,
         orderBy: { name: 'asc' },
         include: {
-          _count: { select: { customers: true, orders: true } },
+          _count: { select: { customerLocations: true, orders: true } },
         },
       }),
       prisma.rayon.count({ where }),
