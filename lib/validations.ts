@@ -180,6 +180,17 @@ export const deliveryLogSchema = z.object({
 
 // ==================== FLEET UPDATE ====================
 
+export const armadaSchema = z.object({
+  vehicleId:   z.string().min(1, 'Kendaraan wajib dipilih'),
+  driverId:    z.string().min(1, 'Driver wajib dipilih'),
+  helperName:  z.string().optional(),
+  rayonId:     z.string().optional(),
+  activeStatus: z.boolean().optional(),
+  notes:       z.string().optional(),
+})
+
+export type ArmadaInput = z.infer<typeof armadaSchema>
+
 export const updateFleetStatusSchema = z.object({
   remainingLoad: z.number().min(0).optional(),
   departureTime: z.string().optional(),

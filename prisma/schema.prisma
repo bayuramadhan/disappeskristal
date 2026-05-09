@@ -87,6 +87,7 @@ model Rayon {
   updatedAt        DateTime  @updatedAt
 
   customerLocations CustomerLocation[]
+  armadas           Armada[]
   orders            Order[]
   fleetDailyStatus  FleetDailyStatus[]
   priceProfiles     PriceProfile[]
@@ -103,6 +104,7 @@ model Vehicle {
   updatedAt             DateTime      @updatedAt
 
   drivers             Driver[]
+  armadas             Armada[]
   orders              Order[]
   fleetDailyStatus    FleetDailyStatus[]
   deliveryLogs        DeliveryLog[]
@@ -128,6 +130,7 @@ model Driver {
   updatedAt         DateTime     @updatedAt
 
   assignedVehicle    Vehicle?            @relation(fields: [assignedVehicleId], references: [id])
+  armadas            Armada[]
   fleetDailyStatus   FleetDailyStatus[]
   deliveryLogs       DeliveryLog[]
   driverAttendances  DriverAttendance[]
@@ -138,6 +141,28 @@ enum DriverStatus {
   ACTIVE
   INACTIVE
   ON_LEAVE
+}
+
+// Armada = pairing permanen Driver + Kendaraan, beserta helper & rayon default
+model Armada {
+  id           String    @id @default(cuid())
+  vehicleId    String
+  driverId     String
+  helperName   String?
+  rayonId      String?
+  activeStatus Boolean   @default(true)
+  notes        String?
+  deletedAt    DateTime?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+  driver  Driver  @relation(fields: [driverId],  references: [id])
+  rayon   Rayon?  @relation(fields: [rayonId],   references: [id])
+
+  @@index([vehicleId])
+  @@index([driverId])
+  @@index([activeStatus])
 }
 
 model Customer {
