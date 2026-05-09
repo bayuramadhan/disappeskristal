@@ -28,7 +28,11 @@ export async function GET(req: NextRequest) {
     const where: Record<string, unknown> = { deletedAt: null }
 
     if (dateParam) where.deliveryDate = parseDate(dateParam, todayDate())
-    if (status)    where.status       = status
+    if (status) {
+      // Support comma-separated: status=CONFIRMED,ASSIGNED
+      const statuses = status.split(',').map((s: string) => s.trim()).filter(Boolean)
+      where.status = statuses.length === 1 ? statuses[0] : { in: statuses }
+    }
     if (channel)   where.orderChannel = channel
     if (rayonId)   where.rayonId      = rayonId
     if (vehicleId) where.vehicleId    = vehicleId

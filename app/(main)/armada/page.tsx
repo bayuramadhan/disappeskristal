@@ -47,13 +47,18 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
   const rayonParam = (!showAllRayon && rayonId) ? `&rayonId=${rayonId}` : ''
 
   const { data: unassigned, isLoading: loadingUnassigned } = useSWR(
-    addOpen ? `/api/orders?date=${date}&limit=100&status=CONFIRMED${rayonParam}` : null,
+    // Fetch CONFIRMED + ASSIGNED — ASSIGNED mungkin masih punya sisa qty untuk armada lain
+    addOpen ? `/api/orders?date=${date}&limit=100&status=CONFIRMED,ASSIGNED${rayonParam}` : null,
     fetcher,
   )
-  // Tampilkan pesanan yang masih punya sisa qty belum dialokasikan
-  const unassignedOrders: any[] = (unassigned?.orders ?? unassigned ?? []).filter(
-    (o: any) => (o.remainingQty ?? o.orderedQty) > 0
-  )
+  // Tampilkan pesanan yang masih punya sisa qty belum dialokasikan ke armada LAIN
+  const unassignedOrders: any[] = (unassigned?.orders ?? unassigned ?? []).filter((o: any) => {
+    const remaining = o.remainingQty ?? o.orderedQty
+    // Kurangi jika sudah ada assignment ke vehicle INI (agar tidak double)
+    const assignedToThis = (o.vehicleAssignments ?? [])
+      .find((a: any) => a.vehicleId === armada?.vehicleId)?.qty ?? 0
+    return (remaining - assignedToThis) > 0
+  })
 
   function openQtyDialog(order: any) {
     const sisaSlot     = armada?.stats?.sisaSlot ?? 0
