@@ -195,7 +195,10 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
                 </div>
               ) : (
                 unassignedOrders.map((o: any) => {
-                  const cukup = o.orderedQty <= (stats?.sisaSlot ?? 0)
+                  const sisaSlot  = stats?.sisaSlot ?? 0
+                  const cukup     = o.orderedQty <= sisaSlot
+                  const slotHabis = sisaSlot === 0
+                  const labelTolak = slotHabis ? 'Slot habis' : 'Terlalu besar'
                   return (
                     <div key={o.id} className={`flex items-center gap-3 rounded-lg border p-3 ${!cukup ? 'opacity-50' : ''}`}>
                       <div className="flex-1 min-w-0">
@@ -203,12 +206,18 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
                         <p className="text-xs text-muted-foreground truncate">
                           {o.deliveryLocation?.namaLokasi ?? '—'}{o.rayon ? ` · ${o.rayon.name}` : ''}
                         </p>
-                        <p className="text-xs mt-0.5 font-semibold">{o.orderedQty} sak</p>
+                        <p className="text-xs mt-0.5">
+                          <span className="font-semibold">{o.orderedQty} sak</span>
+                          {!cukup && !slotHabis && (
+                            <span className="text-muted-foreground ml-1">(sisa {sisaSlot} sak)</span>
+                          )}
+                        </p>
                       </div>
-                      <Button size="sm" variant={cukup ? 'default' : 'outline'}
+                      <Button size="sm" variant="outline"
                         disabled={!cukup || assigning === o.id}
-                        onClick={() => assign(o.id)} className="shrink-0">
-                        {assigning === o.id ? '...' : cukup ? 'Masukkan' : 'Penuh'}
+                        onClick={() => cukup ? assign(o.id) : undefined}
+                        className="shrink-0">
+                        {assigning === o.id ? '...' : cukup ? 'Masukkan' : labelTolak}
                       </Button>
                     </div>
                   )
