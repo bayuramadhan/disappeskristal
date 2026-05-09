@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import {
   Truck, User, Package, Clock, Plus, X, Settings2, CheckCircle2,
-  Navigation2, ArrowRightLeft, Pencil,
+  Navigation2, ArrowRightLeft,
 } from 'lucide-react'
 import useSWR from 'swr'
 import { fetcher } from '@/lib/fetcher'
@@ -507,7 +507,6 @@ export default function PengirimanPage() {
                     <TableHead>Jam Berangkat</TableHead>
                     <TableHead className="text-right">Pesanan</TableHead>
                     <TableHead className="text-right">Terkirim</TableHead>
-                    <TableHead />
                   </TableRow>
                 </TableHeader>
                 <TableBody>
@@ -616,15 +615,6 @@ export default function PengirimanPage() {
                           </span>
                         </TableCell>
 
-                        {/* Aksi */}
-                        <TableCell className="text-right">
-                          {canWrite && (
-                            <Button size="icon" variant="ghost" className="h-7 w-7"
-                              onClick={() => setEditTarget(f)}>
-                              <Pencil className="h-3.5 w-3.5" />
-                            </Button>
-                          )}
-                        </TableCell>
                       </TableRow>
                     )
                   })}
