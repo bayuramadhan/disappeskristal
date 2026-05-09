@@ -72,18 +72,24 @@ export async function POST(req: NextRequest) {
       return apiError('Validasi gagal', 400, parsed.error.flatten().fieldErrors)
     }
 
-    const { customerId, vehicleId, rayonId, orderChannel, orderType,
+    const { customerId, deliveryLocationId, vehicleId, rayonId, orderChannel, orderType,
             orderedQty, pricePerUnit, deliveryDate, notes } = parsed.data
 
-    // Resolve deliveryLocationId + rayonId dari default location customer
-    const defaultLocation = await prisma.customerLocation.findFirst({
-      where:   { customerId, deletedAt: null, isDefault: true },
-      select:  { id: true, rayonId: true },
-    })
-    if (!defaultLocation) return apiError('Customer atau lokasi default tidak ditemukan', 404)
+    // Resolve deliveryLocation: gunakan yang dikirim, atau fallback ke default customer
+    const location = deliveryLocationId
+      ? await prisma.customerLocation.findFirst({
+          where:  { id: deliveryLocationId, customerId, deletedAt: null },
+          select: { id: true, rayonId: true },
+        })
+      : await prisma.customerLocation.findFirst({
+          where:   { customerId, deletedAt: null, isDefault: true },
+          select:  { id: true, rayonId: true },
+        })
 
-    const resolvedRayonId       = rayonId ?? defaultLocation.rayonId ?? undefined
-    const resolvedLocationId    = defaultLocation.id
+    if (!location) return apiError('Lokasi pengiriman tidak ditemukan', 404)
+
+    const resolvedRayonId    = rayonId ?? location.rayonId ?? undefined
+    const resolvedLocationId = location.id
 
     // Generate orderNumber: ORD-YYYYMMDD-XXX
     const dateStr    = new Date(deliveryDate).toISOString().slice(0, 10).replace(/-/g, '')

@@ -68,15 +68,16 @@ export const customerLocationSchema = z.object({
 // ==================== PESANAN ====================
 
 export const orderSchema = z.object({
-  customerId: z.string().min(1, 'Customer wajib dipilih'),
-  vehicleId: z.string().optional(),
-  rayonId: z.string().optional(),
-  orderChannel: z.enum(['PREORDER', 'HOTLINE', 'CANVAS', 'ADMIN_INPUT']),
-  orderType: z.string().optional(),
-  orderedQty: z.number().min(1, 'Jumlah minimal 1'),
-  pricePerUnit: z.number().min(0, 'Harga tidak boleh negatif'),
-  deliveryDate: z.string().min(1, 'Tanggal pengiriman wajib diisi'),
-  notes: z.string().optional(),
+  customerId:         z.string().min(1, 'Customer wajib dipilih'),
+  deliveryLocationId: z.string().optional(), // jika tidak diisi, pakai default location customer
+  vehicleId:          z.string().optional(),
+  rayonId:            z.string().optional(),
+  orderChannel:       z.enum(['PREORDER', 'HOTLINE', 'CANVAS', 'ADMIN_INPUT']),
+  orderType:          z.string().optional(),
+  orderedQty:         z.number().min(1, 'Jumlah minimal 1'),
+  pricePerUnit:       z.number().min(0, 'Harga tidak boleh negatif'),
+  deliveryDate:       z.string().min(1, 'Tanggal pengiriman wajib diisi'),
+  notes:              z.string().optional(),
 })
 
 export const updateOrderStatusSchema = z.object({

@@ -10,7 +10,11 @@ export async function GET() {
   try {
     const drafts = await prisma.waDraft.findMany({
       orderBy: { createdAt: 'desc' },
-      include: { customer: { select: { id: true, name: true, customerType: true } } },
+      include: {
+        customer:         { select: { id: true, name: true, customerType: true } },
+        deliveryLocation: { select: { id: true, namaLokasi: true, alamat: true,
+                                      rayon: { select: { id: true, name: true } } } },
+      },
     })
     return apiSuccess(drafts)
   } catch (err) {
@@ -24,12 +28,35 @@ export async function POST(req: NextRequest) {
 
   try {
     const body = await req.json()
-    const { rawMessage, customerNameHint, customerId, orderedQty, deliveryDate, notes } = body
+    const { rawMessage, customerNameHint, customerId, deliveryLocationId,
+            orderedQty, deliveryDate, notes } = body
 
     if (!rawMessage?.trim()) return apiError('rawMessage wajib diisi', 400)
 
+    // Jika customerId ada tapi deliveryLocationId tidak, pakai default location
+    let resolvedLocationId: string | null = deliveryLocationId || null
+    if (customerId && !resolvedLocationId) {
+      const defaultLoc = await prisma.customerLocation.findFirst({
+        where:  { customerId, deletedAt: null, isDefault: true },
+        select: { id: true },
+      })
+      resolvedLocationId = defaultLoc?.id ?? null
+    }
+
     const draft = await prisma.waDraft.create({
-      data: { rawMessage, customerNameHint, customerId: customerId || null, orderedQty: orderedQty ?? null, deliveryDate: deliveryDate || null, notes: notes || null },
+      data: {
+        rawMessage,
+        customerNameHint:   customerNameHint  || null,
+        customerId:         customerId        || null,
+        deliveryLocationId: resolvedLocationId,
+        orderedQty:         orderedQty        ?? null,
+        deliveryDate:       deliveryDate      || null,
+        notes:              notes             || null,
+      },
+      include: {
+        customer:         { select: { id: true, name: true, customerType: true } },
+        deliveryLocation: { select: { id: true, namaLokasi: true, alamat: true } },
+      },
     })
     return apiCreated(draft)
   } catch (err) {
