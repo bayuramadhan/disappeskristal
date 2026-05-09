@@ -49,12 +49,22 @@ export async function GET(req: NextRequest) {
           vehicle:          { select: { id: true, plateNumber: true } },
           rayon:            { select: { id: true, name: true } },
           _count:           { select: { deliveryLogs: true } },
+          vehicleAssignments: {
+            where:  { deletedAt: null },
+            select: { vehicleId: true, qty: true },
+          },
         },
       }),
       prisma.order.count({ where }),
     ])
 
-    return apiSuccess(orders, undefined, makeMeta(page, limit, total))
+    // Enrich: tambahkan totalAllocated & remainingQty per pesanan
+    const enriched = orders.map(o => {
+      const totalAllocated = o.vehicleAssignments.reduce((s, a) => s + a.qty, 0)
+      return { ...o, totalAllocated, remainingQty: o.orderedQty - totalAllocated }
+    })
+
+    return apiSuccess(enriched, undefined, makeMeta(page, limit, total))
   } catch (err) {
     return apiServerError(err)
   }

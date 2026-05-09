@@ -70,39 +70,58 @@ export async function GET(req: NextRequest) {
       },
     })
 
-    // Enrich: sertakan data armada master (helper, rayon default) + pesanan hari ini
+    // Enrich: gunakan OrderVehicleAssignment untuk kapasitas & daftar pesanan
     const result = await Promise.all(
       fleet.map(async (f) => {
-        // Cari armada master yang bersesuaian
         const masterArmada = armadas.find(a => a.vehicleId === f.vehicleId)
 
-        const orders = await prisma.order.findMany({
+        // Ambil semua assignment untuk vehicle ini pada tanggal ini
+        const assignments = await prisma.orderVehicleAssignment.findMany({
           where: {
-            vehicleId:    f.vehicleId,
-            deliveryDate: date,
-            deletedAt:    null,
-            status:       { notIn: ['CANCELLED', 'REJECTED'] },
+            vehicleId: f.vehicleId,
+            deletedAt: null,
+            order: {
+              deliveryDate: date,
+              deletedAt:    null,
+              status:       { notIn: ['CANCELLED', 'REJECTED'] },
+            },
           },
-          select: {
-            id: true, orderNumber: true, orderedQty: true, deliveredQty: true,
-            status: true, pricePerUnit: true,
-            customer:         { select: { id: true, name: true, customerType: true } },
-            deliveryLocation: { select: { id: true, namaLokasi: true, alamat: true } },
-            rayon:            { select: { id: true, name: true } },
+          include: {
+            order: {
+              select: {
+                id: true, orderNumber: true, orderedQty: true, deliveredQty: true,
+                status: true, pricePerUnit: true,
+                customer:         { select: { id: true, name: true, customerType: true } },
+                deliveryLocation: { select: { id: true, namaLokasi: true, alamat: true } },
+                rayon:            { select: { id: true, name: true } },
+                // Total alokasi pesanan ini ke SEMUA vehicle (untuk tampilkan split info)
+                vehicleAssignments: {
+                  where:  { deletedAt: null },
+                  select: { vehicleId: true, qty: true },
+                },
+              },
+            },
           },
           orderBy: { createdAt: 'asc' },
         })
 
-        const totalAssigned  = orders.reduce((s, o) => s + o.orderedQty, 0)
+        // Transform: setiap assignment → baris order enriched dengan assignedQty
+        const orders = assignments.map(a => ({
+          ...a.order,
+          assignedQty:    a.qty,          // qty yang dialokasikan ke vehicle INI
+          assignmentId:   a.id,
+          isSplit:        a.order.orderedQty !== a.qty,  // true jika pesanan dibagi
+          totalAllocated: a.order.vehicleAssignments.reduce((s, x) => s + x.qty, 0),
+        }))
+
+        const totalAssigned  = assignments.reduce((s, a) => s + a.qty, 0)
         const totalDelivered = orders.reduce((s, o) => s + (o.deliveredQty ?? 0), 0)
         const capacitySak    = f.vehicle?.capacitySak ?? 0
 
         return {
           ...f,
-          // Override helper/rayon dari master armada jika FleetDailyStatus belum diupdate
-          helperName: f.helperName ?? masterArmada?.helperName ?? null,
-          armadaId:   masterArmada?.id ?? null,
-          // Data master armada untuk deteksi perubahan di Log Harian
+          helperName:           f.helperName ?? masterArmada?.helperName ?? null,
+          armadaId:             masterArmada?.id ?? null,
           masterArmadaDriverId: masterArmada?.driverId   ?? null,
           masterArmadaRayonId:  masterArmada?.rayonId    ?? null,
           masterArmadaHelper:   masterArmada?.helperName ?? null,

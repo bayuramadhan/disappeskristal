@@ -39,6 +39,10 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
   const [showAllRayon, setShowAllRayon] = useState(false)
   const [assigning, setAssigning]       = useState<string | null>(null)
 
+  // Dialog qty input untuk assign
+  const [qtyTarget, setQtyTarget]       = useState<any>(null)   // order yang dipilih
+  const [qtyValue, setQtyValue]         = useState('')
+
   const rayonId    = armada?.rayonId
   const rayonParam = (!showAllRayon && rayonId) ? `&rayonId=${rayonId}` : ''
 
@@ -46,31 +50,44 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
     addOpen ? `/api/orders?date=${date}&limit=100&status=CONFIRMED${rayonParam}` : null,
     fetcher,
   )
+  // Tampilkan pesanan yang masih punya sisa qty belum dialokasikan
   const unassignedOrders: any[] = (unassigned?.orders ?? unassigned ?? []).filter(
-    (o: any) => !o.vehicleId
+    (o: any) => (o.remainingQty ?? o.orderedQty) > 0
   )
 
-  async function assign(orderId: string) {
-    setAssigning(orderId)
+  function openQtyDialog(order: any) {
+    const sisaSlot     = armada?.stats?.sisaSlot ?? 0
+    const remainingQty = order.remainingQty ?? order.orderedQty
+    const defaultQty   = Math.min(sisaSlot, remainingQty)
+    setQtyTarget(order)
+    setQtyValue(String(defaultQty))
+  }
+
+  async function assign() {
+    if (!qtyTarget) return
+    const qty = Number(qtyValue)
+    if (!qty || qty <= 0) { toast({ title: 'Qty harus lebih dari 0', variant: 'destructive' }); return }
+    setAssigning(qtyTarget.id)
     try {
       const res  = await fetch('/api/armada/assign', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, vehicleId: armada.vehicleId }),
+        body: JSON.stringify({ orderId: qtyTarget.id, vehicleId: armada.vehicleId, qty }),
       })
       const json = await res.json()
       if (!res.ok) { toast({ title: 'Gagal menambahkan', description: json.message, variant: 'destructive' }); return }
+      setQtyTarget(null)
       onRefresh()
-      toast({ title: 'Pesanan dimasukkan ke armada', description: json.data?.customer?.name })
+      toast({ title: `${qty} sak dimasukkan ke armada`, description: json.data?.customer?.name })
     } finally { setAssigning(null) }
   }
 
-  async function unassign(orderId: string, customerName: string) {
-    if (!confirm(`Keluarkan pesanan ${customerName} dari armada ini?`)) return
-    setAssigning(orderId)
+  async function unassign(order: any) {
+    if (!confirm(`Keluarkan ${order.customer?.name} dari armada ini?`)) return
+    setAssigning(order.id)
     try {
       const res  = await fetch('/api/armada/assign', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId, vehicleId: null }),
+        body: JSON.stringify({ orderId: order.id, vehicleId: armada.vehicleId, qty: 0 }),
       })
       const json = await res.json()
       if (!res.ok) { toast({ title: 'Gagal mengeluarkan', description: json.message, variant: 'destructive' }); return }
@@ -121,23 +138,31 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
             <p className="text-sm text-muted-foreground text-center py-8">Belum ada pesanan di armada ini.</p>
           ) : (
             orders.map((o: any) => (
-              <div key={o.id} className="flex items-start gap-3 rounded-lg border p-3">
+              <div key={o.assignmentId ?? o.id} className="flex items-start gap-3 rounded-lg border p-3">
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
                     <p className="font-medium text-sm truncate">{o.customer?.name}</p>
                     <StatusBadge status={o.status} />
+                    {o.isSplit && (
+                      <Badge variant="warning" className="text-xs h-4 px-1">Split</Badge>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground truncate mt-0.5">
                     {o.deliveryLocation?.namaLokasi ?? '—'}{o.rayon ? ` · ${o.rayon.name}` : ''}
                   </p>
                   <p className="text-xs mt-1">
-                    <span className="font-semibold">{o.orderedQty} sak</span>
-                    <span className="text-muted-foreground ml-2">{formatCurrency(o.orderedQty * o.pricePerUnit)}</span>
+                    <span className="font-semibold">{o.assignedQty ?? o.orderedQty} sak</span>
+                    {o.isSplit && (
+                      <span className="text-muted-foreground ml-1">dari {o.orderedQty} sak total</span>
+                    )}
+                    <span className="text-muted-foreground ml-2">
+                      {formatCurrency((o.assignedQty ?? o.orderedQty) * o.pricePerUnit)}
+                    </span>
                   </p>
                 </div>
                 {canWrite && !['DELIVERED', 'CANCELLED', 'REJECTED', 'RETURNED'].includes(o.status) && (
                   <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive shrink-0"
-                    disabled={assigning === o.id} onClick={() => unassign(o.id, o.customer?.name)}>
+                    disabled={assigning === o.id} onClick={() => unassign(o)}>
                     <X className="h-3.5 w-3.5" />
                   </Button>
                 )}
@@ -154,6 +179,51 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
             </Button>
           </div>
         )}
+
+        {/* Dialog konfirmasi qty ────────────────────────────────────── */}
+        <Dialog open={!!qtyTarget} onOpenChange={o => { if (!o) setQtyTarget(null) }}>
+          <DialogContent className="max-w-sm">
+            <DialogHeader>
+              <DialogTitle>Berapa sak untuk armada ini?</DialogTitle>
+              <p className="text-sm text-muted-foreground">{qtyTarget?.customer?.name}</p>
+            </DialogHeader>
+            <div className="space-y-3">
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>Total pesanan</span>
+                <span className="font-medium text-foreground">{qtyTarget?.orderedQty} sak</span>
+              </div>
+              {(qtyTarget?.totalAllocated ?? 0) > 0 && (
+                <div className="flex justify-between text-sm text-muted-foreground">
+                  <span>Sudah dialokasikan (armada lain)</span>
+                  <span>{qtyTarget?.totalAllocated} sak</span>
+                </div>
+              )}
+              <div className="flex justify-between text-sm text-muted-foreground">
+                <span>Sisa slot armada ini</span>
+                <span>{stats?.sisaSlot ?? 0} sak</span>
+              </div>
+              <div className="space-y-1.5 pt-1">
+                <Label>Jumlah sak untuk armada ini <span className="text-destructive">*</span></Label>
+                <Input
+                  type="number" min={1}
+                  max={Math.min(stats?.sisaSlot ?? 0, qtyTarget?.remainingQty ?? qtyTarget?.orderedQty ?? 0)}
+                  value={qtyValue}
+                  onChange={e => setQtyValue(e.target.value)}
+                  autoFocus
+                />
+                <p className="text-xs text-muted-foreground">
+                  Maks: {Math.min(stats?.sisaSlot ?? 0, qtyTarget?.remainingQty ?? qtyTarget?.orderedQty ?? 0)} sak
+                </p>
+              </div>
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setQtyTarget(null)}>Batal</Button>
+              <Button onClick={assign} disabled={assigning === qtyTarget?.id}>
+                {assigning === qtyTarget?.id ? 'Menyimpan...' : 'Masukkan'}
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
 
         {/* Dialog pilih pesanan */}
         <Dialog open={addOpen} onOpenChange={setAddOpen}>
@@ -195,29 +265,37 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
                 </div>
               ) : (
                 unassignedOrders.map((o: any) => {
-                  const sisaSlot  = stats?.sisaSlot ?? 0
-                  const cukup     = o.orderedQty <= sisaSlot
-                  const slotHabis = sisaSlot === 0
-                  const labelTolak = slotHabis ? 'Slot habis' : 'Terlalu besar'
+                  const sisaSlot     = stats?.sisaSlot ?? 0
+                  const remainingQty = o.remainingQty ?? o.orderedQty
+                  const bisaMasuk    = sisaSlot > 0   // bisa masuk sebagian asal ada slot
+                  const maxQty       = Math.min(sisaSlot, remainingQty)
                   return (
-                    <div key={o.id} className={`flex items-center gap-3 rounded-lg border p-3 ${!cukup ? 'opacity-50' : ''}`}>
+                    <div key={o.id} className="flex items-center gap-3 rounded-lg border p-3">
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{o.customer?.name}</p>
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <p className="font-medium text-sm truncate">{o.customer?.name}</p>
+                          {o.totalAllocated > 0 && (
+                            <Badge variant="warning" className="text-xs h-4 px-1">
+                              {o.totalAllocated}/{o.orderedQty} sak dialokasikan
+                            </Badge>
+                          )}
+                        </div>
                         <p className="text-xs text-muted-foreground truncate">
                           {o.deliveryLocation?.namaLokasi ?? '—'}{o.rayon ? ` · ${o.rayon.name}` : ''}
                         </p>
                         <p className="text-xs mt-0.5">
-                          <span className="font-semibold">{o.orderedQty} sak</span>
-                          {!cukup && !slotHabis && (
-                            <span className="text-muted-foreground ml-1">(sisa {sisaSlot} sak)</span>
+                          <span className="font-semibold">{remainingQty} sak</span>
+                          <span className="text-muted-foreground ml-1">tersisa</span>
+                          {sisaSlot > 0 && maxQty < remainingQty && (
+                            <span className="text-muted-foreground ml-1">· maks {maxQty} sak di armada ini</span>
                           )}
                         </p>
                       </div>
-                      <Button size="sm" variant="outline"
-                        disabled={!cukup || assigning === o.id}
-                        onClick={() => cukup ? assign(o.id) : undefined}
+                      <Button size="sm"
+                        disabled={!bisaMasuk || assigning === o.id}
+                        onClick={() => { if (bisaMasuk) openQtyDialog(o) }}
                         className="shrink-0">
-                        {assigning === o.id ? '...' : cukup ? 'Masukkan' : labelTolak}
+                        {assigning === o.id ? '...' : bisaMasuk ? 'Masukkan' : 'Slot habis'}
                       </Button>
                     </div>
                   )

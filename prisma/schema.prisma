@@ -111,6 +111,7 @@ model Vehicle {
   vehicleLoads        VehicleLoad[]
   vehicleCosts        VehicleCost[]
   vehicleMaintenances VehicleMaintenance[]
+  orderAssignments    OrderVehicleAssignment[]
 }
 
 enum VehicleStatus {
@@ -284,6 +285,7 @@ model Order {
   vehicle          Vehicle?          @relation(fields: [vehicleId], references: [id])
   rayon            Rayon?            @relation(fields: [rayonId], references: [id])
   deliveryLogs     DeliveryLog[]
+  vehicleAssignments OrderVehicleAssignment[]
 
   @@index([deliveryDate, status])
   @@index([customerId])
@@ -292,6 +294,24 @@ model Order {
   @@index([rayonId, deliveryDate])
   @@index([status])
   @@index([orderChannel])
+}
+
+// Alokasi sak per kendaraan untuk satu pesanan (split delivery)
+model OrderVehicleAssignment {
+  id        String    @id @default(cuid())
+  orderId   String
+  vehicleId String
+  qty       Float     // jumlah sak yang dialokasikan ke kendaraan ini
+  deletedAt DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @updatedAt
+
+  order   Order   @relation(fields: [orderId], references: [id])
+  vehicle Vehicle @relation(fields: [vehicleId], references: [id])
+
+  @@index([orderId])
+  @@index([vehicleId])
+  @@index([orderId, vehicleId])
 }
 
 enum OrderChannel {
