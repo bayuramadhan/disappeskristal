@@ -29,11 +29,15 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
 }) {
   const { toast } = useToast()
   const { canWrite } = useRole()
-  const [addOpen, setAddOpen]     = useState(false)
-  const [assigning, setAssigning] = useState<string | null>(null)
+  const [addOpen, setAddOpen]       = useState(false)
+  const [showAllRayon, setShowAllRayon] = useState(false)
+  const [assigning, setAssigning]   = useState<string | null>(null)
+
+  const rayonId  = armada?.rayonId
+  const rayonParam = (!showAllRayon && rayonId) ? `&rayonId=${rayonId}` : ''
 
   const { data: unassigned, isLoading: loadingUnassigned } = useSWR(
-    addOpen ? `/api/orders?date=${date}&limit=100&status=CONFIRMED` : null,
+    addOpen ? `/api/orders?date=${date}&limit=100&status=CONFIRMED${rayonParam}` : null,
     fetcher,
   )
   const unassignedOrders: any[] = (unassigned?.orders ?? unassigned ?? []).filter(
@@ -139,7 +143,7 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
         {/* Tombol tambah */}
         {canWrite && (stats?.sisaSlot ?? 0) > 0 && (
           <div className="px-6 py-4 border-t">
-            <Button className="w-full gap-2" onClick={() => setAddOpen(true)}>
+            <Button className="w-full gap-2" onClick={() => { setShowAllRayon(false); setAddOpen(true) }}>
               <Plus className="h-4 w-4" /> Tambah Pesanan ({stats?.sisaSlot} sak tersisa)
             </Button>
           </div>
@@ -150,17 +154,39 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
           <DialogContent className="max-w-lg max-h-[80vh] flex flex-col">
             <DialogHeader>
               <DialogTitle>Pilih Pesanan — {armada?.vehicle?.plateNumber}</DialogTitle>
-              <p className="text-sm text-muted-foreground">
-                Sisa kapasitas: <span className="font-semibold text-foreground">{stats?.sisaSlot} sak</span>
-              </p>
+              <div className="flex items-center justify-between gap-2 flex-wrap">
+                <p className="text-sm text-muted-foreground">
+                  Sisa kapasitas: <span className="font-semibold text-foreground">{stats?.sisaSlot} sak</span>
+                  {!showAllRayon && armada?.rayon && (
+                    <span className="ml-2 text-sky-600">· {armada.rayon.name}</span>
+                  )}
+                </p>
+                {rayonId && (
+                  <Button
+                    type="button" variant="ghost" size="sm"
+                    className="h-7 text-xs text-muted-foreground"
+                    onClick={() => setShowAllRayon(v => !v)}
+                  >
+                    {showAllRayon ? 'Filter rayon ini' : 'Tampilkan semua rayon'}
+                  </Button>
+                )}
+              </div>
             </DialogHeader>
             <div className="flex-1 overflow-y-auto space-y-2">
               {loadingUnassigned ? (
                 <LoadingState rows={4} />
               ) : unassignedOrders.length === 0 ? (
-                <p className="text-sm text-muted-foreground text-center py-6">
-                  Tidak ada pesanan terkonfirmasi yang belum diassign untuk tanggal ini.
-                </p>
+                <div className="text-center py-6 space-y-2">
+                  <p className="text-sm text-muted-foreground">
+                    Tidak ada pesanan terkonfirmasi yang belum diassign
+                    {!showAllRayon && armada?.rayon ? ` di ${armada.rayon.name}` : ''}.
+                  </p>
+                  {!showAllRayon && rayonId && (
+                    <Button variant="outline" size="sm" onClick={() => setShowAllRayon(true)}>
+                      Tampilkan semua rayon
+                    </Button>
+                  )}
+                </div>
               ) : (
                 unassignedOrders.map((o: any) => {
                   const cukup = o.orderedQty <= (stats?.sisaSlot ?? 0)
