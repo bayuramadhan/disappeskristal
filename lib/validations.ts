@@ -49,15 +49,20 @@ export const driverSchema = z.object({
 // ==================== PELANGGAN ====================
 
 export const customerSchema = z.object({
-  name: z.string().min(2, 'Nama customer minimal 2 karakter'),
-  phone: z.string().optional(),
-  address: z.string().optional(),
-  rayonId: z.string().optional(),
+  name:         z.string().min(2, 'Nama customer minimal 2 karakter'),
+  phone:        z.string().optional(),
   customerType: z.enum(['WARUNG', 'DEPOT', 'TOKO']),
   defaultPrice: z.number().min(0).default(0),
-  notes: z.string().optional(),
-  gpsLat: z.number().optional(),
-  gpsLng: z.number().optional(),
+  notes:        z.string().optional(),
+})
+
+export const customerLocationSchema = z.object({
+  namaLokasi: z.string().min(1, 'Nama lokasi wajib diisi'),
+  alamat:     z.string().optional(),
+  rayonId:    z.string().optional(),
+  gpsLat:     z.number().optional(),
+  gpsLng:     z.number().optional(),
+  isDefault:  z.boolean().optional(),
 })
 
 // ==================== PESANAN ====================

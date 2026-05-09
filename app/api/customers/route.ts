@@ -5,7 +5,11 @@ import {
   apiSuccess, apiCreated, apiError, apiServerError,
   parsePagination, makeMeta,
 } from '@/lib/api/response'
-import { customerSchema } from '@/lib/validations'
+import { customerSchema, customerLocationSchema } from '@/lib/validations'
+
+const locationInclude = {
+  rayon: { select: { id: true, name: true } },
+}
 
 // ─── GET /api/customers ───────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
@@ -13,7 +17,7 @@ export async function GET(req: NextRequest) {
   if (error) return error
 
   try {
-    const sp = req.nextUrl.searchParams
+    const sp           = req.nextUrl.searchParams
     const { page, limit, skip } = parsePagination(sp)
 
     const rayonId      = sp.get('rayonId')
@@ -23,16 +27,27 @@ export async function GET(req: NextRequest) {
 
     const where: Record<string, unknown> = { deletedAt: null }
 
-    if (rayonId)      where.rayonId      = rayonId
     if (customerType) where.customerType = customerType
     if (activeStatus !== null && activeStatus !== undefined) {
       where.activeStatus = activeStatus === 'true'
     }
+
+    // rayonId filter → via locations
+    if (rayonId) {
+      where.locations = { some: { rayonId, deletedAt: null } }
+    }
+
     if (search) {
       where.OR = [
-        { name:    { contains: search, mode: 'insensitive' } },
-        { phone:   { contains: search, mode: 'insensitive' } },
-        { address: { contains: search, mode: 'insensitive' } },
+        { name:  { contains: search, mode: 'insensitive' } },
+        { phone: { contains: search, mode: 'insensitive' } },
+        { locations: { some: {
+          deletedAt: null,
+          OR: [
+            { namaLokasi: { contains: search, mode: 'insensitive' } },
+            { alamat:     { contains: search, mode: 'insensitive' } },
+          ],
+        }}},
       ]
     }
 
@@ -43,7 +58,11 @@ export async function GET(req: NextRequest) {
         take:    limit,
         orderBy: { name: 'asc' },
         include: {
-          rayon:  { select: { id: true, name: true } },
+          locations: {
+            where:   { deletedAt: null },
+            orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+            include: locationInclude,
+          },
           _count: { select: { orders: true } },
         },
       }),
@@ -57,24 +76,44 @@ export async function GET(req: NextRequest) {
 }
 
 // ─── POST /api/customers ──────────────────────────────────────────────────────
+// Body: { ...customerFields, location: { namaLokasi, alamat, rayonId, ... } }
 export async function POST(req: NextRequest) {
   const { error } = await requireAuth()
   if (error) return error
 
   try {
-    const body   = await req.json()
-    const parsed = customerSchema.safeParse(body)
-    if (!parsed.success) {
-      return apiError('Validasi gagal', 400, parsed.error.flatten().fieldErrors)
+    const body = await req.json()
+
+    const customerParsed = customerSchema.safeParse(body)
+    if (!customerParsed.success) {
+      return apiError('Validasi customer gagal', 400, customerParsed.error.flatten().fieldErrors)
+    }
+
+    // Lokasi pertama wajib ada
+    const locParsed = customerLocationSchema.safeParse(body.location ?? {
+      namaLokasi: customerParsed.data.name,
+    })
+    if (!locParsed.success) {
+      return apiError('Validasi lokasi gagal', 400, locParsed.error.flatten().fieldErrors)
     }
 
     const customer = await prisma.customer.create({
       data: {
-        ...parsed.data,
-        customerType: parsed.data.customerType as any,
-        rayonId: parsed.data.rayonId ?? null,
+        ...customerParsed.data,
+        customerType: customerParsed.data.customerType as any,
+        locations: {
+          create: {
+            ...locParsed.data,
+            isDefault: true,
+          },
+        },
       },
-      include: { rayon: { select: { id: true, name: true } } },
+      include: {
+        locations: {
+          where:   { deletedAt: null },
+          include: locationInclude,
+        },
+      },
     })
 
     return apiCreated(customer, 'Customer berhasil ditambahkan')

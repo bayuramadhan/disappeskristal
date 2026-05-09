@@ -6,6 +6,10 @@ import { customerSchema } from '@/lib/validations'
 
 type Params = { params: { id: string } }
 
+const locationInclude = {
+  rayon: { select: { id: true, name: true } },
+}
+
 // ─── GET /api/customers/[id] ──────────────────────────────────────────────────
 export async function GET(_req: NextRequest, { params }: Params) {
   const { error } = await requireAuth()
@@ -13,24 +17,28 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
   try {
     const customer = await prisma.customer.findFirst({
-      where: { id: params.id, deletedAt: null },
+      where:   { id: params.id, deletedAt: null },
       include: {
-        rayon: { select: { id: true, name: true, coverageArea: true } },
+        locations: {
+          where:   { deletedAt: null },
+          orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+          include: locationInclude,
+        },
       },
     })
     if (!customer) return apiNotFound('Customer')
 
-    // Last 20 orders
     const [recentOrders, orderStats] = await Promise.all([
       prisma.order.findMany({
         where:   { customerId: params.id, deletedAt: null },
         orderBy: { deliveryDate: 'desc' },
         take:    20,
         select: {
-          id: true, deliveryDate: true, orderChannel: true, orderedQty: true,
-          deliveredQty: true, returnedQty: true, pricePerUnit: true,
-          status: true, notes: true, createdAt: true,
-          vehicle: { select: { id: true, plateNumber: true } },
+          id: true, orderNumber: true, deliveryDate: true, orderChannel: true,
+          orderedQty: true, deliveredQty: true, returnedQty: true,
+          pricePerUnit: true, status: true, notes: true, createdAt: true,
+          deliveryLocation: { select: { id: true, namaLokasi: true, alamat: true } },
+          vehicle:          { select: { id: true, plateNumber: true } },
         },
       }),
       prisma.order.aggregate({
@@ -47,7 +55,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
         totalOrders:       orderStats._count.id,
         totalDeliveredQty: orderStats._sum.deliveredQty ?? 0,
         totalReturnedQty:  orderStats._sum.returnedQty  ?? 0,
-        totalRevenue:      recentOrders
+        totalRevenue: recentOrders
           .filter(o => ['DELIVERED', 'PARTIAL'].includes(o.status))
           .reduce((sum, o) => sum + o.deliveredQty * o.pricePerUnit, 0),
       },
@@ -80,7 +88,13 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         ...parsed.data,
         ...(parsed.data.customerType && { customerType: parsed.data.customerType as any }),
       },
-      include: { rayon: { select: { id: true, name: true } } },
+      include: {
+        locations: {
+          where:   { deletedAt: null },
+          orderBy: [{ isDefault: 'desc' }, { createdAt: 'asc' }],
+          include: locationInclude,
+        },
+      },
     })
 
     return apiSuccess(updated, 'Customer berhasil diperbarui')
@@ -102,7 +116,6 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     })
     if (!existing) return apiNotFound('Customer')
 
-    // Check active orders
     const activeOrders = await prisma.order.count({
       where: {
         customerId: params.id,
