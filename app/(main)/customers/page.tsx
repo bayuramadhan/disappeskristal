@@ -151,9 +151,10 @@ export default function CustomersPage() {
                       </Select>
                     </div>
                     <div className="space-y-1.5">
-                      <Label>Harga Default (Rp/sak)</Label>
+                      <Label>Harga Referensi (Rp/sak) <span className="text-muted-foreground font-normal text-xs">— opsional</span></Label>
                       <Input type="number" min={0} value={form.defaultPrice}
                         onChange={e => setForm(f => ({ ...f, defaultPrice: e.target.value }))} placeholder="0" />
+                      <p className="text-xs text-muted-foreground">Harga aktual order ditentukan oleh Price Profile (tipe + rayon + tanggal).</p>
                     </div>
                   </div>
                 </div>
@@ -188,7 +189,7 @@ export default function CustomersPage() {
                       </SelectContent>
                     </Select>
                     {!form.rayonId && (
-                      <p className="text-xs text-amber-600">Tanpa rayon, harga jual tidak akan otomatis terisi saat order.</p>
+                      <p className="text-xs text-amber-600">Tanpa rayon, hanya Price Profile yang berlaku untuk semua rayon yang akan dipakai. Harga mungkin tidak sesuai.</p>
                     )}
                   </div>
                 </div>
@@ -226,9 +227,10 @@ export default function CustomersPage() {
                   </Select>
                 </div>
                 <div className="space-y-1.5">
-                  <Label>Harga Default (Rp/sak)</Label>
+                  <Label>Harga Referensi (Rp/sak) <span className="text-muted-foreground font-normal text-xs">— opsional</span></Label>
                   <Input type="number" min={0} value={editForm.defaultPrice}
                     onChange={e => setEditForm(f => ({ ...f, defaultPrice: e.target.value }))} placeholder="0" />
+                  <p className="text-xs text-muted-foreground">Harga aktual order ditentukan oleh Price Profile (tipe + rayon + tanggal).</p>
                 </div>
               </div>
               <div className="space-y-1.5">
