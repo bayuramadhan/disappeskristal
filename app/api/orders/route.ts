@@ -52,6 +52,7 @@ export async function GET(req: NextRequest) {
           deliveryLocation: { select: { id: true, namaLokasi: true, alamat: true } },
           vehicle:          { select: { id: true, plateNumber: true } },
           rayon:            { select: { id: true, name: true } },
+          uom:              { select: { id: true, name: true, abbreviation: true, unitsPerSak: true } },
           _count:           { select: { deliveryLogs: true } },
           vehicleAssignments: {
             where:  { deletedAt: null },
@@ -87,7 +88,7 @@ export async function POST(req: NextRequest) {
     }
 
     const { customerId, deliveryLocationId, vehicleId, rayonId, orderChannel, orderType,
-            orderedQty, pricePerUnit, deliveryDate, notes } = parsed.data
+            orderedQty, uomId, pricePerUnit, deliveryDate, notes } = parsed.data
 
     // Resolve deliveryLocation: gunakan yang dikirim, atau fallback ke default customer
     const location = deliveryLocationId
@@ -122,6 +123,7 @@ export async function POST(req: NextRequest) {
         orderChannel: orderChannel as any,
         orderType:    orderType ?? 'ES_KRISTAL',
         orderedQty,
+        uomId:        uomId ?? null,
         pricePerUnit,
         deliveryDate: new Date(deliveryDate),
         notes:        notes ?? null,
@@ -131,6 +133,7 @@ export async function POST(req: NextRequest) {
         deliveryLocation: { select: { id: true, namaLokasi: true, alamat: true } },
         vehicle:          { select: { id: true, plateNumber: true } },
         rayon:            { select: { id: true, name: true } },
+        uom:              { select: { id: true, name: true, abbreviation: true, unitsPerSak: true } },
       },
     })
 

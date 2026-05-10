@@ -274,6 +274,7 @@ model Order {
   returnedQty        Float        @default(0)
   additionalQty      Float        @default(0)
   pricePerUnit       Float        @default(0)
+  uomId              String?                      // unit of measure (null = sak/base)
   status             OrderStatus  @default(CREATED)
   notes              String?
   deliveryDate       DateTime     @db.Date
@@ -282,6 +283,7 @@ model Order {
   updatedAt          DateTime     @updatedAt
 
   customer         Customer          @relation(fields: [customerId], references: [id])
+  uom              Unit?             @relation(fields: [uomId], references: [id])
   deliveryLocation CustomerLocation? @relation(fields: [deliveryLocationId], references: [id])
   vehicle          Vehicle?          @relation(fields: [vehicleId], references: [id])
   rayon            Rayon?            @relation(fields: [rayonId], references: [id])
@@ -525,6 +527,24 @@ model VehicleMaintenance {
   @@index([vehicleId, serviceDate])
 }
 
+// ==================== UNIT OF MEASURE ====================
+
+model Unit {
+  id            String    @id @default(cuid())
+  name          String    // "Sak", "Kilogram", "Ton"
+  abbreviation  String    @unique // "sak", "kg", "ton"
+  unitsPerSak   Float     @default(1) // berapa unit ini = 1 sak (kg: 25, ton: 40, sak: 1)
+  isBase        Boolean   @default(false) // true hanya untuk sak
+  isActive      Boolean   @default(true)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  orders   Order[]
+  waDrafts WaDraft[]
+
+  @@index([isActive])
+}
+
 // ==================== WA DRAFT ====================
 
 // ==================== ACTIVITY LOG ====================
@@ -571,12 +591,14 @@ model WaDraft {
   customerId         String?
   deliveryLocationId String?
   orderedQty         Float?
+  uomId              String?
   deliveryDate       String?
   notes              String?
   createdAt          DateTime  @default(now())
 
   customer         Customer?         @relation(fields: [customerId], references: [id], onDelete: SetNull)
   deliveryLocation CustomerLocation? @relation(fields: [deliveryLocationId], references: [id], onDelete: SetNull)
+  uom              Unit?             @relation(fields: [uomId], references: [id], onDelete: SetNull)
 
   @@index([createdAt])
 }

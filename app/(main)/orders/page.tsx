@@ -347,7 +347,7 @@ export default function OrdersPage() {
   const [newOrderOpen, setNewOrderOpen]   = useState(false)
   const [newOrderForm, setNewOrderForm]   = useState({
     customerId: '', deliveryLocationId: '', orderChannel: 'PREORDER', deliveryDate: today,
-    orderedQty: '', pricePerUnit: '', notes: '',
+    orderedQty: '', uomId: '', pricePerUnit: '', notes: '',
   })
   const [submitting, setSubmitting]       = useState(false)
   const [actionLoading, setActionLoading] = useState(false)
@@ -360,6 +360,7 @@ const { canWrite, isAdmin } = useRole()
   const { data, isLoading } = useOrders({ ...filters, limit: 20 })
   const { data: customers }  = useCustomers({ limit: 200 } as any)
   const { data: waDrafts, mutate: mutateDrafts } = useSWR<any[]>('/api/wa-drafts', fetcher)
+  const { data: units = [] } = useSWR<any[]>('/api/units', fetcher)
 
   // Baca ?date= dan ?orderId= dari URL saat mount (dari klik notifikasi)
   useEffect(() => {
@@ -442,6 +443,7 @@ const { canWrite, isAdmin } = useRole()
         body: JSON.stringify({
           ...newOrderForm,
           deliveryLocationId: newOrderForm.deliveryLocationId || undefined,
+          uomId:        newOrderForm.uomId || undefined,
           orderedQty:   Number(newOrderForm.orderedQty),
           pricePerUnit: Number(newOrderForm.pricePerUnit),
         }),
@@ -449,7 +451,7 @@ const { canWrite, isAdmin } = useRole()
       if (res.ok) {
         setNewOrderOpen(false)
         globalMutate(key => typeof key === 'string' && key.startsWith('/api/orders'))
-        setNewOrderForm({ customerId: '', deliveryLocationId: '', orderChannel: 'PREORDER', deliveryDate: today, orderedQty: '', pricePerUnit: '', notes: '' })
+        setNewOrderForm({ customerId: '', deliveryLocationId: '', orderChannel: 'PREORDER', deliveryDate: today, orderedQty: '', uomId: '', pricePerUnit: '', notes: '' })
         setPriceHint(null)
         toast({ title: 'Pesanan berhasil dibuat', variant: 'success' })
       } else {
@@ -634,8 +636,24 @@ const { canWrite, isAdmin } = useRole()
                     </div>
                     <div className="grid grid-cols-2 gap-3">
                       <div className="space-y-1.5">
-                        <Label>Qty (sak) <span className="text-destructive">*</span></Label>
-                        <Input type="number" min={1} value={newOrderForm.orderedQty} onChange={e => setNewOrderForm(f => ({ ...f, orderedQty: e.target.value }))} required />
+                        <Label>Jumlah <span className="text-destructive">*</span></Label>
+                        <div className="flex gap-1.5">
+                          <Input type="number" min={0.001} step="any" value={newOrderForm.orderedQty} onChange={e => setNewOrderForm(f => ({ ...f, orderedQty: e.target.value }))} required className="flex-1" />
+                          <Select value={newOrderForm.uomId || 'base'} onValueChange={v => setNewOrderForm(f => ({ ...f, uomId: v === 'base' ? '' : v }))}>
+                            <SelectTrigger className="w-20"><SelectValue /></SelectTrigger>
+                            <SelectContent>
+                              {(units as any[]).filter((u: any) => u.isActive).map((u: any) => (
+                                <SelectItem key={u.id} value={u.isBase ? 'base' : u.id}>{u.abbreviation}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        {(() => {
+                          const uom = (units as any[]).find((u: any) => u.id === newOrderForm.uomId)
+                          if (!uom || uom.isBase || !newOrderForm.orderedQty) return null
+                          const inSak = (parseFloat(newOrderForm.orderedQty) / uom.unitsPerSak).toFixed(2)
+                          return <p className="text-xs text-muted-foreground">= {inSak} sak</p>
+                        })()}
                       </div>
                       <div className="space-y-1.5">
                         <Label>Harga/sak (Rp) <span className="text-destructive">*</span></Label>
@@ -741,7 +759,7 @@ const { canWrite, isAdmin } = useRole()
                   <TableHead>Pelanggan</TableHead>
                   <TableHead>Channel</TableHead>
                   <TableHead>Tanggal Kirim</TableHead>
-                  <TableHead className="text-right">Qty (sak)</TableHead>
+                  <TableHead className="text-right">Qty</TableHead>
                   <TableHead className="text-right">Nilai</TableHead>
                   <TableHead>Status</TableHead>
                 </TableRow>
@@ -760,11 +778,16 @@ const { canWrite, isAdmin } = useRole()
                     </TableCell>
                     <TableCell><ChannelTag channel={order.orderChannel} /></TableCell>
                     <TableCell className="text-sm">{order.deliveryDate ? format(new Date(order.deliveryDate), 'dd/MM/yyyy') : '-'}</TableCell>
-                    <TableCell className="text-right text-sm">{order.orderedQty}</TableCell>
                     <TableCell className="text-right text-sm">
-                      {['DELIVERED', 'PARTIAL'].includes(order.status)
-                        ? formatCurrency((order.deliveredQty ?? 0) * order.pricePerUnit)
-                        : formatCurrency(order.orderedQty * order.pricePerUnit)}
+                      {order.orderedQty} <span className="text-muted-foreground text-xs">{order.uom?.abbreviation ?? 'sak'}</span>
+                    </TableCell>
+                    <TableCell className="text-right text-sm">
+                      {(() => {
+                        const ups = order.uom?.unitsPerSak ?? 1
+                        if (['DELIVERED', 'PARTIAL'].includes(order.status))
+                          return formatCurrency(((order.deliveredQty ?? 0) / ups) * order.pricePerUnit)
+                        return formatCurrency((order.orderedQty / ups) * order.pricePerUnit)
+                      })()}
                     </TableCell>
                     <TableCell><StatusBadge status={order.status} /></TableCell>
                   </TableRow>
@@ -852,19 +875,19 @@ const { canWrite, isAdmin } = useRole()
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div><p className="text-muted-foreground text-xs">Channel</p><ChannelTag channel={o.orderChannel} /></div>
                       <div><p className="text-muted-foreground text-xs">Tanggal Kirim</p><p className="font-medium">{o.deliveryDate ? format(new Date(o.deliveryDate), 'dd/MM/yyyy') : '-'}</p></div>
-                      <div><p className="text-muted-foreground text-xs">Qty Dipesan</p><p className="font-semibold">{o.orderedQty} sak</p></div>
+                      <div><p className="text-muted-foreground text-xs">Qty Dipesan</p><p className="font-semibold">{o.orderedQty} {o.uom?.abbreviation ?? 'sak'}</p></div>
                       <div><p className="text-muted-foreground text-xs">Harga/sak</p><p className="font-medium">{formatCurrency(o.pricePerUnit)}</p></div>
-                      <div><p className="text-muted-foreground text-xs">Terkirim</p><p className="font-semibold text-emerald-600">{o.deliveredQty ?? 0} sak</p></div>
-                      <div><p className="text-muted-foreground text-xs">Dikembalikan</p><p className="font-semibold text-destructive">{o.returnedQty ?? 0} sak</p></div>
+                      <div><p className="text-muted-foreground text-xs">Terkirim</p><p className="font-semibold text-emerald-600">{o.deliveredQty ?? 0} {o.uom?.abbreviation ?? 'sak'}</p></div>
+                      <div><p className="text-muted-foreground text-xs">Dikembalikan</p><p className="font-semibold text-destructive">{o.returnedQty ?? 0} {o.uom?.abbreviation ?? 'sak'}</p></div>
                     </div>
                     <div className="rounded-lg bg-muted p-3 grid grid-cols-2 gap-3">
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">Nilai Pesanan</p>
-                        <p className="text-lg font-bold">{formatCurrency(o.orderedQty * o.pricePerUnit)}</p>
+                        <p className="text-lg font-bold">{formatCurrency((o.orderedQty / (o.uom?.unitsPerSak ?? 1)) * o.pricePerUnit)}</p>
                       </div>
                       <div>
                         <p className="text-xs text-muted-foreground mb-1">Nilai Terkirim</p>
-                        <p className="text-lg font-bold text-emerald-600">{formatCurrency((o.deliveredQty ?? 0) * o.pricePerUnit)}</p>
+                        <p className="text-lg font-bold text-emerald-600">{formatCurrency(((o.deliveredQty ?? 0) / (o.uom?.unitsPerSak ?? 1)) * o.pricePerUnit)}</p>
                       </div>
                     </div>
                     {o.notes && (

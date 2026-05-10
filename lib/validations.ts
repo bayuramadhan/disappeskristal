@@ -81,7 +81,8 @@ export const orderSchema = z.object({
   rayonId:            z.string().optional(),
   orderChannel:       z.enum(['PREORDER', 'HOTLINE', 'CANVAS', 'ADMIN_INPUT']),
   orderType:          z.string().optional(),
-  orderedQty:         z.number().min(1, 'Jumlah minimal 1'),
+  orderedQty:         z.number().min(0.001, 'Jumlah minimal 0.001'),
+  uomId:              z.string().optional(), // null = sak (base unit)
   pricePerUnit:       z.number().min(0, 'Harga tidak boleh negatif'),
   deliveryDate:       z.string().min(1, 'Tanggal pengiriman wajib diisi'),
   notes:              z.string().optional(),

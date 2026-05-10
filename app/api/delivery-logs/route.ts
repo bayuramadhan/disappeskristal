@@ -7,6 +7,7 @@ import {
 } from '@/lib/api/response'
 import { deliveryLogSchema } from '@/lib/validations'
 import { syncWarehouseStock } from '@/lib/warehouse'
+import { toSak } from '@/lib/uom'
 
 // ─── Derived order status from qty ───────────────────────────────────────────
 function deriveOrderStatus(
@@ -89,7 +90,10 @@ export async function POST(req: NextRequest) {
     // Validate order exists and isn't already finalised
     const order = await prisma.order.findFirst({
       where:  { id: orderId, deletedAt: null },
-      include: { customer: { select: { id: true, name: true } } },
+      include: {
+        customer: { select: { id: true, name: true } },
+        uom:      { select: { unitsPerSak: true, abbreviation: true } },
+      },
     })
     if (!order) return apiNotFound('Order')
 
@@ -121,8 +125,9 @@ export async function POST(req: NextRequest) {
       const alreadyLogged    = alreadyDelivered + alreadyReturned
       const newTotal         = alreadyLogged + deliveredQty + (returnedQty ?? 0)
       if (newTotal > assignment.qty) {
+        const uomLabel = order.uom?.abbreviation ?? 'sak'
         return apiError(
-          `Melebihi alokasi armada ini. Alokasi: ${assignment.qty} sak, sudah tercatat: ${alreadyLogged} sak`,
+          `Melebihi alokasi armada ini. Alokasi: ${assignment.qty} ${uomLabel}, sudah tercatat: ${alreadyLogged} ${uomLabel}`,
           400,
         )
       }
@@ -142,10 +147,13 @@ export async function POST(req: NextRequest) {
     })
 
     // Net qty leaving the vehicle = delivered - returned (returned comes back)
-    const netOut = deliveredQty - (returnedQty ?? 0)
+    // Fleet remainingLoad selalu dalam sak — konversi dulu
+    const unitsPerSak  = order.uom?.unitsPerSak ?? 1
+    const netOutInUnit = deliveredQty - (returnedQty ?? 0)
+    const netOutInSak  = toSak(netOutInUnit, unitsPerSak)
 
     // Validate net qty doesn't exceed remaining load
-    if (fleet && netOut > (fleet.remainingLoad ?? 0)) {
+    if (fleet && netOutInSak > (fleet.remainingLoad ?? 0)) {
       return apiError(
         `Jumlah terkirim melebihi sisa muatan armada (sisa: ${fleet.remainingLoad} sak)`,
         400,
@@ -177,7 +185,7 @@ export async function POST(req: NextRequest) {
         prisma.fleetDailyStatus.update({
           where: { id: fleet.id },
           data: {
-            remainingLoad: { decrement: netOut < 0 ? 0 : netOut },
+            remainingLoad: { decrement: netOutInSak < 0 ? 0 : netOutInSak },
           },
         }),
       ] : []),
@@ -205,11 +213,11 @@ export async function POST(req: NextRequest) {
       },
     }).catch(() => null)
 
-    // Sync warehouse stock: deliveredQty goes out, returnedQty comes back
+    // Sync warehouse stock: selalu dalam sak
     const stockDate = new Date(order.deliveryDate)
     await syncWarehouseStock(stockDate, {
-      loadingOut: deliveredQty,
-      returnedIn: returnedQty ?? 0,
+      loadingOut: toSak(deliveredQty, unitsPerSak),
+      returnedIn: toSak(returnedQty ?? 0, unitsPerSak),
     }).catch(() => {}) // non-blocking: stock sync failure must not break delivery log
 
     const fullLog = await prisma.deliveryLog.findUnique({

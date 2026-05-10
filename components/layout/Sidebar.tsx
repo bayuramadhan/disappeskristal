@@ -5,7 +5,7 @@ import { usePathname } from 'next/navigation'
 import { useState } from 'react'
 import {
   LayoutDashboard, ShoppingCart, Truck, Users, BarChart3,
-  Factory, ChevronLeft, ChevronRight, IceCream2, MapPin, Tag, Settings2, Navigation2,
+  Factory, ChevronLeft, ChevronRight, IceCream2, MapPin, Tag, Settings2, Navigation2, Ruler,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useRole } from '@/hooks/useRole'
@@ -25,6 +25,7 @@ const masterNav: NavItem[] = [
   { href: '/master/armada',         label: 'Armada',     icon: Settings2, roles: ['ADMIN', 'SUPERVISOR'] },
   { href: '/master/rayons',         label: 'Rayon',      icon: MapPin,    roles: ['ADMIN', 'SUPERVISOR'] },
   { href: '/master/price-profiles', label: 'Harga Jual', icon: Tag,       roles: ['ADMIN', 'SUPERVISOR'] },
+  { href: '/master/units',          label: 'Satuan',     icon: Ruler,     roles: ['ADMIN'] },
 ]
 
 const roleLabel: Record<string, string> = {

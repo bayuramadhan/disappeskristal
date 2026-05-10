@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/db'
 import { requireAuth } from '@/lib/api/auth'
 import { apiSuccess, apiError, apiNotFound, apiServerError } from '@/lib/api/response'
+import { toSak } from '@/lib/uom'
 
 // ─── POST /api/armada/assign ──────────────────────────────────────────────────
 // Assign:   { orderId, vehicleId, qty }      → alokasikan qty sak ke vehicle
@@ -20,6 +21,7 @@ export async function POST(req: NextRequest) {
       select: {
         id: true, orderedQty: true, status: true, vehicleId: true, deliveryDate: true,
         orderNumber: true,
+        uom: { select: { unitsPerSak: true, abbreviation: true } },
         customer: { select: { id: true, name: true } },
         vehicleAssignments: {
           where:  { deletedAt: null },
@@ -112,6 +114,10 @@ export async function POST(req: NextRequest) {
     })
     if (!vehicle) return apiError('Armada tidak ditemukan atau tidak aktif', 404)
 
+    // unitsPerSak untuk konversi ke sak (kapasitas kendaraan selalu dalam sak)
+    const unitsPerSak = order.uom?.unitsPerSak ?? 1
+    const uomLabel    = order.uom?.abbreviation ?? 'sak'
+
     // Validasi 1: qty yang diminta tidak melebihi sisa orderedQty yang belum dialokasikan
     const alreadyAssigned = order.vehicleAssignments
       .filter(a => a.vehicleId !== vehicleId)  // exclude vehicle ini (kalau update)
@@ -119,30 +125,34 @@ export async function POST(req: NextRequest) {
     const maxQty = order.orderedQty - alreadyAssigned
     if (qty > maxQty) {
       return apiError(
-        `Qty melebihi sisa pesanan yang belum dialokasikan (maks ${maxQty} sak)`, 400
+        `Qty melebihi sisa pesanan yang belum dialokasikan (maks ${maxQty} ${uomLabel})`, 400
       )
     }
 
-    // Validasi 2: kapasitas vehicle untuk tanggal itu
-    const usedCapacityResult = await prisma.orderVehicleAssignment.aggregate({
+    // Validasi 2: kapasitas vehicle (dalam sak) untuk tanggal itu
+    // Semua assignment dikumpulkan lalu dikonversi ke sak sesuai unit masing-masing order
+    const otherAssignments = await prisma.orderVehicleAssignment.findMany({
       where: {
         vehicleId,
         deletedAt: null,
-        orderId:   { not: orderId },   // exclude assignment lain dari pesanan ini
+        orderId:   { not: orderId },
         order: {
           deliveryDate: order.deliveryDate,
           deletedAt:    null,
           status:       { notIn: ['CANCELLED', 'REJECTED'] },
         },
       },
-      _sum: { qty: true },
+      select: { qty: true, order: { select: { uom: { select: { unitsPerSak: true } } } } },
     })
-    const usedCapacity = usedCapacityResult._sum.qty ?? 0
-    if (usedCapacity + qty > vehicle.capacitySak) {
-      const sisa = vehicle.capacitySak - usedCapacity
+    const usedCapacitySak = otherAssignments.reduce((sum, a) => {
+      return sum + toSak(a.qty, a.order.uom?.unitsPerSak)
+    }, 0)
+    const newQtySak = toSak(qty, unitsPerSak)
+    if (usedCapacitySak + newQtySak > vehicle.capacitySak) {
+      const sisaSak = vehicle.capacitySak - usedCapacitySak
       return apiError(
         `Kapasitas ${vehicle.plateNumber} tidak cukup. ` +
-        `Sisa slot: ${sisa} sak, diminta: ${qty} sak`,
+        `Sisa: ${sisaSak.toFixed(1)} sak, diminta: ${newQtySak.toFixed(1)} sak`,
         409,
       )
     }
@@ -179,8 +189,9 @@ export async function POST(req: NextRequest) {
       customerName: order.customer.name,
       plateNumber:  vehicle.plateNumber,
       qty,
+      uom: uomLabel,
     })
-    return apiSuccess(updated, `${qty} sak dialokasikan ke armada`)
+    return apiSuccess(updated, `${qty} ${uomLabel} dialokasikan ke armada`)
   } catch (err) {
     return apiServerError(err)
   }
