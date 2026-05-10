@@ -52,8 +52,9 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
   const rayonParam = (!showAllRayon && rayonId) ? `&rayonId=${rayonId}` : ''
 
   const { data: unassigned, isLoading: loadingUnassigned } = useSWR(
-    // Fetch CONFIRMED + ASSIGNED — ASSIGNED mungkin masih punya sisa qty untuk armada lain
-    addOpen ? `/api/orders?date=${date}&limit=100&status=CONFIRMED,ASSIGNED${rayonParam}` : null,
+    // Fetch CONFIRMED + ASSIGNED + PARTIAL — PARTIAL bisa terjadi karena armada lain sudah
+    // mulai mencatat pengiriman, tapi sisa qty-nya mungkin masih belum dialokasikan ke armada lain
+    addOpen ? `/api/orders?date=${date}&limit=100&status=CONFIRMED,ASSIGNED,PARTIAL${rayonParam}` : null,
     fetcher,
   )
   // Tampilkan pesanan yang masih punya sisa qty belum dialokasikan ke armada LAIN
