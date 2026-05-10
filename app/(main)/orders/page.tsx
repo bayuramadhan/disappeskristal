@@ -894,7 +894,15 @@ const { canWrite, isAdmin } = useRole()
                     <div className="grid grid-cols-2 gap-3 text-sm">
                       <div><p className="text-muted-foreground text-xs">Channel</p><ChannelTag channel={o.orderChannel} /></div>
                       <div><p className="text-muted-foreground text-xs">Tanggal Kirim</p><p className="font-medium">{o.deliveryDate ? format(new Date(o.deliveryDate), 'dd/MM/yyyy') : '-'}</p></div>
-                      <div><p className="text-muted-foreground text-xs">Qty Dipesan</p><p className="font-semibold">{o.orderedQty} {o.uom?.abbreviation ?? 'sak'}</p></div>
+                      <div>
+                        <p className="text-muted-foreground text-xs">Qty Dipesan</p>
+                        <p className="font-semibold">{o.orderedQty} {o.uom?.abbreviation ?? 'sak'}</p>
+                        {o.uom && !o.uom.isBase && (
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            = {parseFloat((o.orderedQty / o.uom.unitsPerSak).toFixed(2))} sak
+                          </p>
+                        )}
+                      </div>
                       <div><p className="text-muted-foreground text-xs">Harga/sak</p><p className="font-medium">{formatCurrency(o.pricePerUnit)}</p></div>
                       <div><p className="text-muted-foreground text-xs">Terkirim</p><p className="font-semibold text-emerald-600">{o.deliveredQty ?? 0} {o.uom?.abbreviation ?? 'sak'}</p></div>
                       <div><p className="text-muted-foreground text-xs">Dikembalikan</p><p className="font-semibold text-destructive">{o.returnedQty ?? 0} {o.uom?.abbreviation ?? 'sak'}</p></div>
