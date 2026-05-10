@@ -408,28 +408,43 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
   })
 
   function openQtyDialog(order: any) {
-    const sisaSlot     = armada?.stats?.sisaSlot ?? 0
-    const remainingQty = order.remainingQty ?? order.orderedQty
-    const defaultQty   = Math.min(sisaSlot, remainingQty)
+    const sisaSlot      = armada?.stats?.sisaSlot ?? 0
+    const remainingQty  = order.remainingQty ?? order.orderedQty
+    const remainingSak  = qtyInSak(remainingQty, order.uom?.unitsPerSak)
+    const defaultQtySak = Math.min(sisaSlot, remainingSak)
     setQtyTarget(order)
-    setQtyValue(String(defaultQty))
+    setQtyValue(String(defaultQtySak))
   }
 
   async function assign() {
     if (!qtyTarget) return
-    const qty = Number(qtyValue)
-    if (!qty || qty <= 0) { toast({ title: 'Qty harus lebih dari 0', variant: 'destructive' }); return }
+    const qtySak = Number(qtyValue)
+    if (!qtySak || qtySak <= 0) { toast({ title: 'Qty harus lebih dari 0', variant: 'destructive' }); return }
+
+    // Validasi frontend: tidak boleh melebihi maks sak
+    const sisaSlot     = armada?.stats?.sisaSlot ?? 0
+    const remainingQty = qtyTarget.remainingQty ?? qtyTarget.orderedQty
+    const maxSak       = Math.min(sisaSlot, qtyInSak(remainingQty, qtyTarget.uom?.unitsPerSak))
+    if (qtySak > maxSak) {
+      toast({ title: `Maks ${maxSak} sak`, description: 'Qty melebihi batas', variant: 'destructive' })
+      return
+    }
+
+    // Konversi sak → raw unit (kg/ton/dll) untuk dikirim ke API
+    const unitsPerSak = qtyTarget.uom?.unitsPerSak ?? 1
+    const qtyRaw      = Math.min(qtySak * unitsPerSak, remainingQty)
+
     setAssigning(qtyTarget.id)
     try {
       const res  = await fetch('/api/armada/assign', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ orderId: qtyTarget.id, vehicleId: armada.vehicleId, qty }),
+        body: JSON.stringify({ orderId: qtyTarget.id, vehicleId: armada.vehicleId, qty: qtyRaw }),
       })
       const json = await res.json()
       if (!res.ok) { toast({ title: 'Gagal menambahkan', description: json.message, variant: 'destructive' }); return }
       setQtyTarget(null)
       onRefresh()
-      toast({ title: `${qty} sak dimasukkan ke armada`, description: json.data?.customer?.name })
+      toast({ title: `${qtySak} sak dimasukkan ke armada`, description: json.data?.customer?.name })
     } finally { setAssigning(null) }
   }
 
@@ -710,7 +725,7 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
               {(qtyTarget?.totalAllocated ?? 0) > 0 && (
                 <div className="flex justify-between text-sm text-muted-foreground">
                   <span>Sudah dialokasikan (armada lain)</span>
-                  <span>{qtyTarget?.totalAllocated} sak</span>
+                  <span>{qtyInSak(qtyTarget?.totalAllocated ?? 0, qtyTarget?.uom?.unitsPerSak)} sak</span>
                 </div>
               )}
               <div className="flex justify-between text-sm text-muted-foreground">
