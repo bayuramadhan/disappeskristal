@@ -13,16 +13,21 @@ function parseWAMessage(message: string) {
   const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1)
   const dayAfter = new Date(today); dayAfter.setDate(today.getDate() + 2)
 
-  // ── Qty ───────────────────────────────────────────────────────────────────
-  const qtyPatterns = [
-    /(\d+)\s*(?:sak|karung|bag|pcs|unit|koli)/i,
-    /(?:pesan|order|minta|beli|butuh|mau|ambil|kirim|antar|request|mesen)\s+(\d+)/i,
-    /(\d+)\s+(?:sak|karung|bag)/i,
+  // ── Qty + Unit ────────────────────────────────────────────────────────────
+  const unitPatterns: { pat: RegExp; uom: string }[] = [
+    { pat: /(\d+(?:[.,]\d+)?)\s*(?:ton|tonne)\b/i,                    uom: 'ton' },
+    { pat: /(\d+(?:[.,]\d+)?)\s*(?:kilogram|kilogramme|kg)\b/i,       uom: 'kg'  },
+    { pat: /(\d+(?:[.,]\d+)?)\s*(?:sak|karung|bag|koli|pcs|unit)\b/i, uom: 'sak' },
   ]
   let orderedQty: number | null = null
-  for (const pat of qtyPatterns) {
+  let uomHint: string | null    = null
+  for (const { pat, uom } of unitPatterns) {
     const m = text.match(pat)
-    if (m) { orderedQty = parseInt(m[1]); break }
+    if (m) { orderedQty = parseFloat(m[1].replace(',', '.')); uomHint = uom; break }
+  }
+  if (orderedQty === null) {
+    const m = text.match(/(?:pesan|order|minta|beli|butuh|mau|ambil|kirim|antar|request|mesen)\s+(\d+(?:[.,]\d+)?)/i)
+    if (m) { orderedQty = parseFloat(m[1].replace(',', '.')); uomHint = 'sak' }
   }
 
   // ── Date ─────────────────────────────────────────────────────────────────
@@ -111,7 +116,7 @@ function parseWAMessage(message: string) {
   const notesMatch = text.match(/(?:catatan|note|keterangan|ps|info)[:\s]+(.+)/i)
   const notes      = notesMatch ? notesMatch[1].trim() : null
 
-  return { customerName, orderedQty, deliveryDate, notes }
+  return { customerName, orderedQty, uomHint, deliveryDate, notes }
 }
 
 // ─── Normalize phone untuk matching ──────────────────────────────────────────
@@ -174,6 +179,20 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // ── Resolve unit dari uomHint ─────────────────────────────────────────────
+    // Cari Unit record berdasarkan singkatan yang terdeteksi parser
+    // null = sak (base unit), tidak perlu dicari
+    let resolvedUnit: { id: string; abbreviation: string; unitsPerSak: number } | null = null
+    if (parsed.uomHint && parsed.uomHint !== 'sak') {
+      resolvedUnit = await prisma.unit.findUnique({
+        where:  { abbreviation: parsed.uomHint },
+        select: { id: true, abbreviation: true, unitsPerSak: true },
+      }) ?? null
+    }
+    const uomId        = resolvedUnit?.id ?? null
+    const uomLabel     = resolvedUnit?.abbreviation ?? 'sak'
+    const unitsPerSak  = resolvedUnit?.unitsPerSak ?? 1
+
     // ── Auto-create order jika semua data lengkap ─────────────────────────────
     if (customer && parsed.orderedQty) {
       const defaultLocation = customer.locations[0]
@@ -205,6 +224,7 @@ export async function POST(req: NextRequest) {
             orderChannel:       'HOTLINE',
             deliveryDate:       new Date(parsed.deliveryDate),
             orderedQty:         parsed.orderedQty,
+            uomId,
             pricePerUnit:       priceProfile.price,
             notes:              parsed.notes,
             status:             'CREATED',
@@ -225,6 +245,7 @@ export async function POST(req: NextRequest) {
               orderNumber,
               customerName: customer.name,
               orderedQty:   parsed.orderedQty,
+              uom:          uomLabel,
               pricePerUnit: priceProfile.price,
               orderChannel: 'HOTLINE',
               source:       'fonnte_webhook',
@@ -234,30 +255,37 @@ export async function POST(req: NextRequest) {
         }).catch(() => null)
 
         try {
-          // Format tanggal DD/MM/YYYY untuk pesan WA
           const [yyyy, mm, dd] = parsed.deliveryDate.split('-')
-          const tglFmt = `${dd}/${mm}/${yyyy}`
-          const totalHarga = (parsed.orderedQty * priceProfile.price).toLocaleString('id-ID')
+          const tglFmt  = `${dd}/${mm}/${yyyy}`
+          // Harga selalu /sak, konversi qty ke sak untuk hitung total
+          const qtySak  = parsed.orderedQty / unitsPerSak
+          const total   = (qtySak * priceProfile.price).toLocaleString('id-ID')
+          // Tampilkan qty dalam unit yang dipesan pelanggan
+          const qtyDisp = Number.isInteger(parsed.orderedQty)
+            ? parsed.orderedQty
+            : parseFloat(parsed.orderedQty.toFixed(2))
+          // Baris konversi (hanya tampil jika bukan sak)
+          const konversi = uomLabel !== 'sak'
+            ? `\n⚖️ ${qtyDisp} ${uomLabel} = ${parseFloat(qtySak.toFixed(2))} sak`
+            : ''
 
           await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/webhook/fonnte/send`, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               target:  sender,
-              message: `✅ Pesanan diterima!\n\n🏪 ${customer.name}\n📦 ${parsed.orderedQty} sak es kristal\n📅 Tanggal kirim: ${tglFmt}\n💰 ${priceProfile.price.toLocaleString('id-ID')}/sak × ${parsed.orderedQty} = Rp ${totalHarga}\n🔖 No. Pesanan: ${orderNumber}\n\nTerima kasih sudah memesan! 🙏`,
+              message: `✅ Pesanan diterima!\n\n🏪 ${customer.name}\n📦 ${qtyDisp} ${uomLabel} es kristal${konversi}\n📅 Tanggal kirim: ${tglFmt}\n💰 ${priceProfile.price.toLocaleString('id-ID')}/sak × ${parseFloat(qtySak.toFixed(2))} sak = Rp ${total}\n🔖 No. Pesanan: ${orderNumber}\n\nTerima kasih sudah memesan! 🙏`,
             }),
           })
         } catch (sendErr) {
           console.error('Failed to send confirmation:', sendErr)
         }
 
-        return apiSuccess({ action: 'order_created', orderId: order.id, customer: customer.name, qty: parsed.orderedQty })
+        return apiSuccess({ action: 'order_created', orderId: order.id, customer: customer.name, qty: parsed.orderedQty, uom: uomLabel })
       }
     }
 
     // ── Simpan sebagai draft ──────────────────────────────────────────────────
-    // Jika customer sudah dikenali, pre-fill deliveryLocationId dengan lokasi default-nya
-    // sehingga operator tidak perlu pilih lokasi lagi saat review draft
     const draftLocationId = customer?.locations?.[0]?.id ?? null
 
     const draft = await prisma.waDraft.create({
@@ -268,6 +296,7 @@ export async function POST(req: NextRequest) {
         customerId:         customer?.id ?? null,
         deliveryLocationId: draftLocationId,
         orderedQty:         parsed.orderedQty,
+        uomId,
         deliveryDate:       parsed.deliveryDate,
         notes:              parsed.notes,
       },

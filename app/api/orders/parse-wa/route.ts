@@ -13,17 +13,37 @@ function parseWAMessage(message: string) {
   const tomorrow = new Date(today); tomorrow.setDate(today.getDate() + 1)
   const dayAfter = new Date(today); dayAfter.setDate(today.getDate() + 2)
 
-  // ── Qty ───────────────────────────────────────────────────────────────────
-  // Match patterns: "10 sak", "pesan 5", "order 20 karung", "minta 3sak"
-  const qtyPatterns = [
-    /(\d+)\s*(?:sak|karung|bag|pcs|unit)/i,
-    /(?:pesan|order|minta|beli|butuh|mau|request)\s+(\d+)/i,
-    /(\d+)\s+(?:sak|karung)/i,
+  // ── Qty + Unit ────────────────────────────────────────────────────────────
+  // Pola: angka lalu unit, atau kata pesan/order lalu angka
+  // Kembalikan juga uomHint (singkatan unit yang terdeteksi) untuk dicocokkan ke tabel Unit
+  const unitPatterns: { pat: RegExp; uom: string }[] = [
+    // ton / tonne
+    { pat: /(\d+(?:[.,]\d+)?)\s*(?:ton|tonne)\b/i,                 uom: 'ton' },
+    // kilogram / kg
+    { pat: /(\d+(?:[.,]\d+)?)\s*(?:kilogram|kilogramme|kg)\b/i,    uom: 'kg' },
+    // sak / karung / bag / koli
+    { pat: /(\d+(?:[.,]\d+)?)\s*(?:sak|karung|bag|koli|pcs|unit)\b/i, uom: 'sak' },
   ]
+
   let orderedQty: number | null = null
-  for (const pat of qtyPatterns) {
+  let uomHint: string | null    = null
+
+  for (const { pat, uom } of unitPatterns) {
     const m = text.match(pat)
-    if (m) { orderedQty = parseInt(m[1]); break }
+    if (m) {
+      orderedQty = parseFloat(m[1].replace(',', '.'))
+      uomHint    = uom
+      break
+    }
+  }
+
+  // Fallback: kata pesan/order lalu angka (tanpa unit eksplisit → anggap sak)
+  if (orderedQty === null) {
+    const verbFirst = text.match(/(?:pesan|order|minta|beli|butuh|mau|request|mesen|ambil|kirim|antar)\s+(\d+(?:[.,]\d+)?)/i)
+    if (verbFirst) {
+      orderedQty = parseFloat(verbFirst[1].replace(',', '.'))
+      uomHint    = 'sak'
+    }
   }
 
   // ── Date ─────────────────────────────────────────────────────────────────
@@ -96,7 +116,7 @@ function parseWAMessage(message: string) {
   const notesMatch = text.match(/(?:catatan|note|keterangan|ps)[:\s]+(.+)/i)
   const notes = notesMatch ? notesMatch[1].trim() : null
 
-  return { customerName, customerPhone, orderedQty, deliveryDate, notes }
+  return { customerName, customerPhone, orderedQty, uomHint, deliveryDate, notes }
 }
 
 // ─── POST /api/orders/parse-wa ────────────────────────────────────────────────
