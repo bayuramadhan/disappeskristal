@@ -1,0 +1,231 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 900 1160" font-family="system-ui, -apple-system, sans-serif">
+
+  <!-- Background -->
+  <rect width="900" height="1160" fill="#f8fafc"/>
+
+  <!-- Title -->
+  <text x="450" y="44" text-anchor="middle" font-size="22" font-weight="700" fill="#0f172a">Alur Operasional Harian — Distribusi Es Kristal</text>
+  <text x="450" y="66" text-anchor="middle" font-size="13" fill="#64748b">Dari pesanan masuk hingga pengiriman selesai</text>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- BARIS 1 — Pesanan Masuk -->
+  <!-- ══════════════════════════════════════════════ -->
+
+  <text x="30" y="118" font-size="11" font-weight="600" fill="#94a3b8" letter-spacing="1">PESANAN MASUK</text>
+  <line x1="30" y1="123" x2="870" y2="123" stroke="#e2e8f0" stroke-width="1"/>
+
+  <!-- Box: WA Pelanggan -->
+  <rect x="50" y="135" width="180" height="80" rx="12" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="140" y="162" text-anchor="middle" font-size="18">💬</text>
+  <text x="140" y="183" text-anchor="middle" font-size="13" font-weight="600" fill="#15803d">Pesan WhatsApp</text>
+  <text x="140" y="200" text-anchor="middle" font-size="11" fill="#166534">"pesan 10 sak besok"</text>
+
+  <!-- Box: Manual/Telepon -->
+  <rect x="270" y="135" width="180" height="80" rx="12" fill="#dbeafe" stroke="#2563eb" stroke-width="1.5"/>
+  <text x="360" y="162" text-anchor="middle" font-size="18">📞</text>
+  <text x="360" y="183" text-anchor="middle" font-size="13" font-weight="600" fill="#1d4ed8">Input Manual</text>
+  <text x="360" y="200" text-anchor="middle" font-size="11" fill="#1e40af">Telepon / walk-in</text>
+
+  <!-- Panah ke bawah dari WA -->
+  <line x1="140" y1="215" x2="140" y2="250" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <polygon points="134,248 140,258 146,248" fill="#94a3b8"/>
+
+  <!-- Panah ke bawah dari Manual -->
+  <line x1="360" y1="215" x2="360" y2="250" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <polygon points="354,248 360,258 366,248" fill="#94a3b8"/>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- BARIS 2 — Parse & Simpan -->
+  <!-- ══════════════════════════════════════════════ -->
+
+  <!-- Box: Auto parse WA -->
+  <rect x="50" y="260" width="180" height="72" rx="10" fill="#fff" stroke="#94a3b8" stroke-width="1.2"/>
+  <text x="140" y="284" text-anchor="middle" font-size="11" fill="#475569">Sistem baca pesan:</text>
+  <text x="140" y="300" text-anchor="middle" font-size="11" fill="#475569">📦 Jumlah sak</text>
+  <text x="140" y="316" text-anchor="middle" font-size="11" fill="#475569">📅 Tanggal kirim</text>
+
+  <!-- Box: Form manual -->
+  <rect x="270" y="260" width="180" height="72" rx="10" fill="#fff" stroke="#94a3b8" stroke-width="1.2"/>
+  <text x="360" y="284" text-anchor="middle" font-size="11" fill="#475569">Isi form:</text>
+  <text x="360" y="300" text-anchor="middle" font-size="11" fill="#475569">👤 Pelanggan</text>
+  <text x="360" y="316" text-anchor="middle" font-size="11" fill="#475569">📦 Qty · 📅 Tanggal</text>
+
+  <!-- Panah dari WA parse ke diamond -->
+  <line x1="140" y1="332" x2="140" y2="358" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <polygon points="134,356 140,366 146,356" fill="#94a3b8"/>
+
+  <!-- Panah dari Manual form turun -->
+  <line x1="360" y1="332" x2="360" y2="366" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <polygon points="354,364 360,374 366,364" fill="#94a3b8"/>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- BARIS 3 — Cek Data -->
+  <!-- ══════════════════════════════════════════════ -->
+
+  <!-- Diamond WA: pelanggan dikenali? -->
+  <polygon points="140,368 200,408 140,448 80,408" fill="#fef9c3" stroke="#ca8a04" stroke-width="1.5"/>
+  <text x="140" y="403" text-anchor="middle" font-size="10" fill="#854d0e">Pelanggan</text>
+  <text x="140" y="416" text-anchor="middle" font-size="10" fill="#854d0e">dikenali?</text>
+
+  <!-- Label Ya -->
+  <rect x="202" y="396" width="28" height="16" rx="4" fill="#dcfce7"/>
+  <text x="216" y="408" text-anchor="middle" font-size="10" fill="#16a34a" font-weight="700">Ya ✓</text>
+
+  <!-- Label Tidak -->
+  <rect x="118" y="450" width="44" height="16" rx="4" fill="#fef2f2"/>
+  <text x="140" y="462" text-anchor="middle" font-size="10" fill="#dc2626" font-weight="700">Tidak</text>
+
+  <!-- Panah "Ya" ke kanan dari diamond -->
+  <line x1="200" y1="408" x2="255" y2="408" stroke="#16a34a" stroke-width="1.5"/>
+  <polygon points="253,402 263,408 253,414" fill="#16a34a"/>
+
+  <!-- Panah "Tidak" ke bawah dari diamond -->
+  <line x1="140" y1="448" x2="140" y2="480" stroke="#dc2626" stroke-width="1.5"/>
+  <polygon points="134,478 140,488 146,478" fill="#dc2626"/>
+
+  <!-- Box: Draft -->
+  <rect x="60" y="490" width="160" height="62" rx="10" fill="#fef2f2" stroke="#dc2626" stroke-width="1.5"/>
+  <text x="140" y="514" text-anchor="middle" font-size="13">📝</text>
+  <text x="140" y="532" text-anchor="middle" font-size="12" font-weight="600" fill="#b91c1c">Simpan sebagai Draft</text>
+  <text x="140" y="546" text-anchor="middle" font-size="10" fill="#ef4444">Perlu review operator</text>
+
+  <!-- Panah dari Draft ke kanan menuju Pesanan box -->
+  <line x1="220" y1="521" x2="258" y2="521" stroke="#f97316" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <polygon points="256,515 266,521 256,527" fill="#f97316"/>
+  <!-- Label "Review" di atas panah, dengan background putih -->
+  <rect x="224" y="508" width="30" height="12" rx="3" fill="#fff7ed"/>
+  <text x="239" y="518" text-anchor="middle" font-size="9" fill="#ea580c" font-weight="600">Review</text>
+
+  <!-- Garis dari "Ya" WA ke kanan lalu turun ke Pesanan box -->
+  <line x1="263" y1="408" x2="330" y2="408" stroke="#16a34a" stroke-width="1.5"/>
+  <line x1="330" y1="408" x2="330" y2="488" stroke="#16a34a" stroke-width="1.5"/>
+  <polygon points="324,486 330,496 336,486" fill="#16a34a"/>
+
+  <!-- Manual: panah dari 360,374 turun ke 360,408 lalu ke Pesanan box -->
+  <line x1="360" y1="374" x2="360" y2="488" stroke="#2563eb" stroke-width="1.5"/>
+  <polygon points="354,486 360,496 366,486" fill="#2563eb"/>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- BARIS 4 — Pesanan Dibuat -->
+  <!-- ══════════════════════════════════════════════ -->
+
+  <text x="30" y="478" font-size="11" font-weight="600" fill="#94a3b8" letter-spacing="1">MENU PESANAN</text>
+  <line x1="30" y1="483" x2="870" y2="483" stroke="#e2e8f0" stroke-width="1"/>
+
+  <!-- Box: Pesanan CREATED -->
+  <rect x="266" y="496" width="240" height="86" rx="12" fill="#f0fdf4" stroke="#16a34a" stroke-width="2"/>
+  <text x="386" y="522" text-anchor="middle" font-size="14">🧾</text>
+  <text x="386" y="542" text-anchor="middle" font-size="14" font-weight="700" fill="#15803d">Pesanan Terbuat</text>
+  <text x="386" y="560" text-anchor="middle" font-size="11" fill="#166534">Status: CREATED</text>
+  <text x="386" y="575" text-anchor="middle" font-size="10" fill="#4ade80">● Log aktivitas tercatat otomatis</text>
+
+  <!-- Garis draft resolved ke pesanan box -->
+  <line x1="266" y1="521" x2="220" y2="521" stroke="#f97316" stroke-width="1.5" stroke-dasharray="4,3"/>
+
+  <!-- Panah dari Pesanan ke bawah -->
+  <line x1="386" y1="582" x2="386" y2="612" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <polygon points="380,610 386,620 392,610" fill="#94a3b8"/>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- BARIS 5 — Armada -->
+  <!-- ══════════════════════════════════════════════ -->
+
+  <text x="30" y="642" font-size="11" font-weight="600" fill="#94a3b8" letter-spacing="1">MENU ARMADA</text>
+  <line x1="30" y1="647" x2="870" y2="647" stroke="#e2e8f0" stroke-width="1"/>
+
+  <!-- Box: Assign ke Armada -->
+  <rect x="266" y="658" width="240" height="92" rx="12" fill="#eff6ff" stroke="#2563eb" stroke-width="2"/>
+  <text x="386" y="686" text-anchor="middle" font-size="14">🚛</text>
+  <text x="386" y="707" text-anchor="middle" font-size="14" font-weight="700" fill="#1d4ed8">Assign ke Armada</text>
+  <text x="386" y="726" text-anchor="middle" font-size="11" fill="#1e40af">Pilih kendaraan + jumlah sak</text>
+  <text x="386" y="742" text-anchor="middle" font-size="10" fill="#60a5fa">● Bisa split ke beberapa armada</text>
+
+  <!-- Panah ke bawah -->
+  <line x1="386" y1="750" x2="386" y2="782" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <polygon points="380,780 386,790 392,780" fill="#94a3b8"/>
+
+  <!-- Box: Set Jam Berangkat -->
+  <rect x="544" y="668" width="190" height="72" rx="10" fill="#fff" stroke="#94a3b8" stroke-width="1.2"/>
+  <text x="639" y="692" text-anchor="middle" font-size="11" font-weight="600" fill="#475569">⏰ Set Jam Berangkat</text>
+  <text x="639" y="710" text-anchor="middle" font-size="11" fill="#64748b">Input langsung di panel</text>
+  <text x="639" y="726" text-anchor="middle" font-size="11" fill="#64748b">armada → auto-simpan</text>
+  <!-- Garis sambung ke Assign box -->
+  <line x1="544" y1="704" x2="506" y2="704" stroke="#cbd5e1" stroke-width="1.2" stroke-dasharray="3,3"/>
+  <polygon points="508,699 500,704 508,709" fill="#cbd5e1"/>
+
+  <!-- Box: Catat Pengiriman -->
+  <rect x="266" y="792" width="240" height="92" rx="12" fill="#fefce8" stroke="#ca8a04" stroke-width="2"/>
+  <text x="386" y="820" text-anchor="middle" font-size="14">📋</text>
+  <text x="386" y="841" text-anchor="middle" font-size="14" font-weight="700" fill="#92400e">Catat Hasil Pengiriman</text>
+  <text x="386" y="860" text-anchor="middle" font-size="11" fill="#78350f">Qty terkirim + dikembalikan</text>
+  <text x="386" y="876" text-anchor="middle" font-size="10" fill="#fbbf24">● Tombol "Catat" di baris pesanan</text>
+
+  <!-- Panah ke bawah -->
+  <line x1="386" y1="884" x2="386" y2="916" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4,3"/>
+  <polygon points="380,914 386,924 392,914" fill="#94a3b8"/>
+
+  <!-- Box: Antrian Pesanan (sidebar) -->
+  <rect x="730" y="792" width="152" height="112" rx="10" fill="#f8fafc" stroke="#cbd5e1" stroke-width="1.2"/>
+  <text x="806" y="814" text-anchor="middle" font-size="11" font-weight="700" fill="#475569">📊 Antrian Pesanan</text>
+  <text x="806" y="831" text-anchor="middle" font-size="10" fill="#64748b">Panel referensi di atas</text>
+  <text x="806" y="845" text-anchor="middle" font-size="10" fill="#64748b">halaman Armada</text>
+  <rect x="742" y="857" width="12" height="8" rx="2" fill="#22c55e"/>
+  <text x="760" y="866" font-size="10" fill="#475569">Sudah penuh</text>
+  <rect x="742" y="873" width="12" height="8" rx="2" fill="#f59e0b"/>
+  <text x="760" y="882" font-size="10" fill="#475569">Sebagian</text>
+  <rect x="742" y="889" width="12" height="8" rx="2" fill="#cbd5e1"/>
+  <text x="760" y="898" font-size="10" fill="#475569">Belum diassign</text>
+
+  <!-- ══════════════════════════════════════════════ -->
+  <!-- BARIS 6 — Status Akhir -->
+  <!-- ══════════════════════════════════════════════ -->
+
+  <text x="30" y="946" font-size="11" font-weight="600" fill="#94a3b8" letter-spacing="1">STATUS AKHIR OTOMATIS</text>
+  <line x1="30" y1="951" x2="870" y2="951" stroke="#e2e8f0" stroke-width="1"/>
+
+  <!-- DELIVERED -->
+  <rect x="30" y="964" width="190" height="82" rx="10" fill="#dcfce7" stroke="#16a34a" stroke-width="1.5"/>
+  <text x="125" y="992" text-anchor="middle" font-size="20">✅</text>
+  <text x="125" y="1015" text-anchor="middle" font-size="13" font-weight="700" fill="#15803d">DELIVERED</text>
+  <text x="125" y="1034" text-anchor="middle" font-size="11" fill="#166534">Semua sak terkirim</text>
+
+  <!-- PARTIAL -->
+  <rect x="240" y="964" width="190" height="82" rx="10" fill="#fff7ed" stroke="#ea580c" stroke-width="1.5"/>
+  <text x="335" y="992" text-anchor="middle" font-size="20">🔶</text>
+  <text x="335" y="1015" text-anchor="middle" font-size="13" font-weight="700" fill="#c2410c">PARTIAL</text>
+  <text x="335" y="1034" text-anchor="middle" font-size="11" fill="#9a3412">Sebagian terkirim</text>
+
+  <!-- RETURNED -->
+  <rect x="450" y="964" width="190" height="82" rx="10" fill="#fef2f2" stroke="#dc2626" stroke-width="1.5"/>
+  <text x="545" y="992" text-anchor="middle" font-size="20">🔴</text>
+  <text x="545" y="1015" text-anchor="middle" font-size="13" font-weight="700" fill="#b91c1c">RETURNED</text>
+  <text x="545" y="1034" text-anchor="middle" font-size="11" fill="#991b1b">Semua dikembalikan</text>
+
+  <!-- CANCELLED -->
+  <rect x="660" y="964" width="190" height="82" rx="10" fill="#f1f5f9" stroke="#64748b" stroke-width="1.5"/>
+  <text x="755" y="992" text-anchor="middle" font-size="20">⚫</text>
+  <text x="755" y="1015" text-anchor="middle" font-size="13" font-weight="700" fill="#334155">CANCELLED</text>
+  <text x="755" y="1034" text-anchor="middle" font-size="11" fill="#475569">Dibatalkan</text>
+
+  <!-- Panah dari Catat ke masing-masing status -->
+  <line x1="330" y1="924" x2="125" y2="962" stroke="#16a34a" stroke-width="1.2"/>
+  <polygon points="120,958 125,968 130,958" fill="#16a34a"/>
+
+  <line x1="370" y1="924" x2="335" y2="962" stroke="#ea580c" stroke-width="1.2"/>
+  <polygon points="330,958 335,968 340,958" fill="#ea580c"/>
+
+  <line x1="410" y1="924" x2="545" y2="962" stroke="#dc2626" stroke-width="1.2"/>
+  <polygon points="540,958 545,968 550,958" fill="#dc2626"/>
+
+  <!-- Partial loop back ke Armada — jalur di kiri -->
+  <path d="M 240 1010 Q 190 1010 190 1080 Q 190 1110 50 1110 Q 20 1110 20 704 Q 20 658 264 658" fill="none" stroke="#ea580c" stroke-width="1.5" stroke-dasharray="5,4"/>
+  <polygon points="262,652 272,658 262,664" fill="#ea580c"/>
+  <!-- Label di bawah -->
+  <rect x="28" y="1076" width="144" height="28" rx="6" fill="#fff7ed" stroke="#fed7aa" stroke-width="1"/>
+  <text x="100" y="1088" text-anchor="middle" font-size="10" fill="#ea580c" font-weight="600">Sisa sak → assign ulang</text>
+  <text x="100" y="1100" text-anchor="middle" font-size="10" fill="#ea580c">ke armada lain</text>
+
+  <!-- Footer -->
+  <text x="450" y="1148" text-anchor="middle" font-size="10" fill="#94a3b8">DistribusiPro — Sistem Manajemen Distribusi Es Kristal</text>
+
+</svg>
