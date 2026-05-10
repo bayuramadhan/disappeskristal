@@ -147,9 +147,11 @@ export async function POST(req: NextRequest) {
         orderId:   order.id,
         date:      new Date(deliveryDate),
         meta: {
-          orderNumber:  order.orderNumber,
-          customerName: order.customer?.name,
+          orderNumber:    order.orderNumber,
+          customerName:   order.customer?.name,
           orderedQty,
+          orderedQtySak:  order.uom ? Math.ceil(orderedQty / order.uom.unitsPerSak) : orderedQty,
+          uom:            order.uom?.abbreviation ?? 'sak',
           pricePerUnit,
           orderChannel,
         } as any,

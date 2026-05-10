@@ -145,7 +145,7 @@ function OrderActivityLog({ date, onDateChange }: { date: string; onDateChange: 
                   {/* Detail spesifik per action */}
                   {log.action === 'ORDER_CREATED' && (
                     <p className="text-sm text-muted-foreground">
-                      {meta.orderedQty} {meta.uom ?? 'sak'} · {meta.orderChannel}
+                      {meta.orderedQtySak ?? meta.orderedQty} sak · {meta.orderChannel}
                       {meta.pricePerUnit && ` · ${formatCurrency(meta.pricePerUnit)}/sak`}
                     </p>
                   )}
@@ -157,18 +157,18 @@ function OrderActivityLog({ date, onDateChange }: { date: string; onDateChange: 
                         <StatusBadge status={meta.toStatus} />
                       </span>
                       {meta.deliveredQty != null && meta.deliveredQty > 0 && (
-                        <span className="ml-2">· {meta.deliveredQty} sak terkirim</span>
+                        <span className="ml-2">· {meta.deliveredQtySak ?? meta.deliveredQty} sak terkirim</span>
                       )}
                     </p>
                   )}
                   {log.action === 'ORDER_DELETED' && (
                     <p className="text-sm text-muted-foreground">
-                      {meta.orderedQty} {meta.uom ?? 'sak'} · status sebelumnya: <StatusBadge status={meta.fromStatus} />
+                      {meta.orderedQtySak ?? meta.orderedQty} sak · status sebelumnya: <StatusBadge status={meta.fromStatus} />
                     </p>
                   )}
                   {log.action === 'ORDER_ASSIGNED' && (
                     <p className="text-sm text-muted-foreground">
-                      {meta.qty} sak → {meta.plateNumber}
+                      {meta.qtySak ?? meta.qty} sak → {meta.plateNumber}
                     </p>
                   )}
                   {log.action === 'ORDER_UNASSIGNED' && (
@@ -180,8 +180,8 @@ function OrderActivityLog({ date, onDateChange }: { date: string; onDateChange: 
                   )}
                   {log.action === 'DELIVERY_LOGGED' && (
                     <p className="text-sm text-muted-foreground">
-                      {meta.deliveredQty} sak terkirim
-                      {meta.returnedQty > 0 && ` · ${meta.returnedQty} retur`}
+                      {meta.deliveredQtySak ?? meta.deliveredQty} sak terkirim
+                      {(meta.returnedQtySak ?? meta.returnedQty) > 0 && ` · ${meta.returnedQtySak ?? meta.returnedQty} sak retur`}
                       {meta.plateNumber && ` · ${meta.plateNumber}`}
                       {' · Status → '}
                       <StatusBadge status={meta.orderStatus} />

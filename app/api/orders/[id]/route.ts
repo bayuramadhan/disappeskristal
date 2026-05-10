@@ -51,7 +51,8 @@ export async function PATCH(req: NextRequest, { params }: Params) {
     }
 
     const existing = await prisma.order.findFirst({
-      where: { id: params.id, deletedAt: null },
+      where:   { id: params.id, deletedAt: null },
+      include: { uom: { select: { abbreviation: true, unitsPerSak: true } } },
     })
     if (!existing) return apiNotFound('Order')
 
@@ -87,13 +88,15 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         orderId:   params.id,
         date:      existing.deliveryDate,
         meta: {
-          orderNumber:  existing.orderNumber,
-          customerName: updated.customer?.name ?? null,
-          fromStatus:   existing.status,
-          toStatus:     status,
-          deliveredQty: deliveredQty ?? null,
-          returnedQty:  returnedQty  ?? null,
-          returnReason: returnReason ?? null,
+          orderNumber:      existing.orderNumber,
+          customerName:     updated.customer?.name ?? null,
+          fromStatus:       existing.status,
+          toStatus:         status,
+          deliveredQty:     deliveredQty ?? null,
+          returnedQty:      returnedQty  ?? null,
+          deliveredQtySak:  deliveredQty != null ? Math.ceil(deliveredQty / (existing.uom?.unitsPerSak ?? 1)) : null,
+          returnedQtySak:   returnedQty  != null ? Math.ceil(returnedQty  / (existing.uom?.unitsPerSak ?? 1)) : null,
+          returnReason:     returnReason ?? null,
         } as any,
       },
     }).catch(() => null)
