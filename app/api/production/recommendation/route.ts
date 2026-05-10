@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/db'
 import { requireAuth } from '@/lib/api/auth'
 import { apiSuccess, apiServerError, parseDate, tomorrowDate, todayDate } from '@/lib/api/response'
+import { toSak } from '@/lib/uom'
 
 const RISK_PCT       = 0.05  // 5% buffer
 const CANVAS_LOOKBACK = 7    // days for canvas forecast
@@ -16,57 +17,59 @@ export async function GET(req: NextRequest) {
     const targetDate = parseDate(sp.get('date'), tomorrowDate())
     const riskPct    = parseFloat(sp.get('riskPct') ?? String(RISK_PCT))
 
-    // ── 1. Confirmed preorders for target date ────────────────────────────
-    const preorderAgg = await prisma.order.aggregate({
+    // ── 1. Confirmed preorders for target date (in sak) ──────────────────
+    const preorderOrders = await prisma.order.findMany({
       where: {
         deliveryDate: targetDate,
         deletedAt:    null,
         orderChannel: 'PREORDER',
         status:       { in: ['CREATED', 'CONFIRMED'] },
       },
-      _sum:   { orderedQty: true },
-      _count: { id: true },
+      select: { orderedQty: true, uom: { select: { unitsPerSak: true } } },
     })
-    const confirmedPreorderQty = preorderAgg._sum.orderedQty ?? 0
-    const confirmedPreorderCount = preorderAgg._count.id
+    const confirmedPreorderQty   = Math.ceil(preorderOrders.reduce((s, o) => s + toSak(o.orderedQty, o.uom?.unitsPerSak), 0))
+    const confirmedPreorderCount = preorderOrders.length
 
-    // ── 2. Canvas forecast (avg daily from last N days) ───────────────────
+    // ── 2. Canvas forecast (avg daily from last N days, in sak) ──────────
     const lookbackStart = new Date(todayDate())
     lookbackStart.setDate(lookbackStart.getDate() - CANVAS_LOOKBACK)
 
-    const canvasHistory = await prisma.order.groupBy({
-      by:    ['deliveryDate'],
+    const canvasOrders = await prisma.order.findMany({
       where: {
         deliveryDate:  { gte: lookbackStart, lt: targetDate },
         deletedAt:     null,
         orderChannel:  'CANVAS',
         status:        { in: ['DELIVERED', 'PARTIAL', 'CREATED', 'CONFIRMED', 'LOADED'] },
       },
-      _sum: { orderedQty: true },
+      select: { deliveryDate: true, orderedQty: true, uom: { select: { unitsPerSak: true } } },
     })
-
-    const avgCanvasQty =
-      canvasHistory.length > 0
-        ? canvasHistory.reduce((s, d) => s + (d._sum.orderedQty ?? 0), 0) / canvasHistory.length
-        : 0
+    // Group by day, sum in sak
+    const canvasByDay = canvasOrders.reduce((map, o) => {
+      const key = new Date(o.deliveryDate).toISOString().slice(0, 10)
+      map[key] = (map[key] ?? 0) + toSak(o.orderedQty, o.uom?.unitsPerSak)
+      return map
+    }, {} as Record<string, number>)
+    const canvasDays   = Object.values(canvasByDay)
+    const avgCanvasQty = canvasDays.length > 0 ? canvasDays.reduce((s, v) => s + v, 0) / canvasDays.length : 0
     const estimatedCanvasQty = Math.ceil(avgCanvasQty)
 
-    // ── 3. Hotline forecast (avg of last 7 days) ──────────────────────────
-    const hotlineHistory = await prisma.order.groupBy({
-      by:    ['deliveryDate'],
+    // ── 3. Hotline forecast (avg of last 7 days, in sak) ─────────────────
+    const hotlineOrders = await prisma.order.findMany({
       where: {
         deliveryDate: { gte: lookbackStart, lt: targetDate },
         deletedAt:    null,
         orderChannel: 'HOTLINE',
         status:       { in: ['DELIVERED', 'PARTIAL', 'CREATED', 'CONFIRMED', 'LOADED'] },
       },
-      _sum: { orderedQty: true },
+      select: { deliveryDate: true, orderedQty: true, uom: { select: { unitsPerSak: true } } },
     })
-
-    const avgHotlineQty =
-      hotlineHistory.length > 0
-        ? hotlineHistory.reduce((s, d) => s + (d._sum.orderedQty ?? 0), 0) / hotlineHistory.length
-        : 0
+    const hotlineByDay = hotlineOrders.reduce((map, o) => {
+      const key = new Date(o.deliveryDate).toISOString().slice(0, 10)
+      map[key] = (map[key] ?? 0) + toSak(o.orderedQty, o.uom?.unitsPerSak)
+      return map
+    }, {} as Record<string, number>)
+    const hotlineDays    = Object.values(hotlineByDay)
+    const avgHotlineQty  = hotlineDays.length > 0 ? hotlineDays.reduce((s, v) => s + v, 0) / hotlineDays.length : 0
     const estimatedHotlineQty = Math.ceil(avgHotlineQty)
 
     // ── 4. Risk adjustment ────────────────────────────────────────────────

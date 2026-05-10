@@ -55,9 +55,11 @@ export async function GET(req: NextRequest) {
         o."rayonId",
         r."name"                                                  AS "rayonName",
         COUNT(o.id)::int                                          AS "totalOrders",
-        COALESCE(SUM(o."deliveredQty"), 0)                        AS "totalDeliveredQty",
-        COALESCE(SUM(o."returnedQty"),  0)                        AS "totalReturnedQty",
-        COALESCE(SUM(o."deliveredQty" * o."pricePerUnit"), 0)     AS "grossRevenue",
+        -- Qty in sak: divide raw qty by unitsPerSak (price is always per sak)
+        COALESCE(SUM(CEIL(o."deliveredQty"::float / COALESCE(u."unitsPerSak", 1))), 0) AS "totalDeliveredQty",
+        COALESCE(SUM(CEIL(o."returnedQty"::float  / COALESCE(u."unitsPerSak", 1))), 0) AS "totalReturnedQty",
+        -- Revenue: pricePerUnit is per sak, so convert qty to sak first
+        COALESCE(SUM(o."deliveredQty"::float / COALESCE(u."unitsPerSak", 1) * o."pricePerUnit"), 0) AS "grossRevenue",
         COALESCE((
           SELECT SUM(vc."fuelCost" + vc."driverCost" + vc."helperCost"
                      + vc."maintenanceCost" + vc."depreciationCost")
@@ -66,6 +68,7 @@ export async function GET(req: NextRequest) {
             AND vc."date"      = o."deliveryDate"
         ), 0)                                                     AS "vehicleCost"
       FROM "Order" o
+      LEFT JOIN "Unit"    u ON u.id = o."uomId"
       LEFT JOIN "Vehicle" v ON v.id = o."vehicleId"
       LEFT JOIN "Rayon"   r ON r.id = o."rayonId"
       WHERE o.status    IN ('DELIVERED', 'PARTIAL')

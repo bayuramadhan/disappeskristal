@@ -12,32 +12,20 @@ export async function GET(req: NextRequest) {
     const sp   = req.nextUrl.searchParams
     const date = parseDate(sp.get('date'), todayDate())
 
-    // Run all aggregations in parallel
     const [
       ordersByStatus,
-      orderRevenue,
       fleetCount,
       warehouseStock,
-      topCustomers,
       returnBreakdown,
+      qtyRows,
+      topCustomerRows,
+      revenueRaw,
     ] = await Promise.all([
 
-      // Orders by status today
+      // Orders by status today (count only — no qty sum)
       prisma.order.groupBy({
         by:     ['status'],
         where:  { deliveryDate: date, deletedAt: null },
-        _count: { id: true },
-        _sum:   { orderedQty: true, deliveredQty: true, returnedQty: true },
-      }),
-
-      // Revenue today
-      prisma.order.aggregate({
-        where: {
-          deliveryDate: date,
-          deletedAt:    null,
-          status:       { in: ['DELIVERED', 'PARTIAL'] },
-        },
-        _sum:   { deliveredQty: true, returnedQty: true },
         _count: { id: true },
       }),
 
@@ -51,21 +39,12 @@ export async function GET(req: NextRequest) {
         orderBy: { date: 'desc' },
       }),
 
-      // Top 5 customers by delivered qty today
-      prisma.order.groupBy({
-        by:     ['customerId'],
-        where:  { deliveryDate: date, deletedAt: null, status: { in: ['DELIVERED', 'PARTIAL'] } },
-        _sum:   { deliveredQty: true },
-        orderBy: { _sum: { deliveredQty: 'desc' } },
-        take:   5,
-      }),
-
       // Return reasons breakdown today
       prisma.deliveryLog.groupBy({
         by:    ['returnReason'],
         where: {
           returnedQty: { gt: 0 },
-          timestamp:   {
+          timestamp: {
             gte: date,
             lt:  new Date(date.getTime() + 86_400_000),
           },
@@ -73,46 +52,80 @@ export async function GET(req: NextRequest) {
         _count: { id: true },
         _sum:   { returnedQty: true },
       }),
+
+      // Qty sums in sak — join Unit table for proper conversion
+      prisma.$queryRaw<{
+        totalOrderedSak:  number
+        totalDeliveredSak: number
+        totalReturnedSak:  number
+      }[]>`
+        SELECT
+          COALESCE(SUM(CEIL(o."orderedQty"::float  / COALESCE(u."unitsPerSak", 1))), 0) AS "totalOrderedSak",
+          COALESCE(SUM(CASE WHEN o.status IN ('DELIVERED','PARTIAL')
+            THEN CEIL(o."deliveredQty"::float / COALESCE(u."unitsPerSak", 1)) ELSE 0 END), 0) AS "totalDeliveredSak",
+          COALESCE(SUM(CASE WHEN o.status IN ('DELIVERED','PARTIAL')
+            THEN CEIL(o."returnedQty"::float  / COALESCE(u."unitsPerSak", 1)) ELSE 0 END), 0) AS "totalReturnedSak"
+        FROM "Order" o
+        LEFT JOIN "Unit" u ON o."uomId" = u.id
+        WHERE o."deliveryDate" = ${date}
+          AND o."deletedAt" IS NULL
+      `,
+
+      // Top 5 customers by delivered sak
+      prisma.$queryRaw<{ customerId: string; totalDeliveredSak: number }[]>`
+        SELECT
+          o."customerId",
+          SUM(CEIL(o."deliveredQty"::float / COALESCE(u."unitsPerSak", 1))) AS "totalDeliveredSak"
+        FROM "Order" o
+        LEFT JOIN "Unit" u ON o."uomId" = u.id
+        WHERE o."deliveryDate" = ${date}
+          AND o."deletedAt" IS NULL
+          AND o.status IN ('DELIVERED', 'PARTIAL')
+        GROUP BY o."customerId"
+        ORDER BY "totalDeliveredSak" DESC
+        LIMIT 5
+      `,
+
+      // Revenue: price is always per sak, so divide qty by unitsPerSak first
+      prisma.$queryRaw<{ gross: number; cost: number }[]>`
+        SELECT
+          COALESCE(SUM(
+            o."deliveredQty"::float / COALESCE(u."unitsPerSak", 1) * o."pricePerUnit"
+          ), 0) AS gross,
+          COALESCE((
+            SELECT SUM("fuelCost" + "driverCost" + "helperCost" + "maintenanceCost" + "depreciationCost")
+            FROM "VehicleCost"
+            WHERE "date" = ${date}
+          ), 0) AS cost
+        FROM "Order" o
+        LEFT JOIN "Unit" u ON o."uomId" = u.id
+        WHERE o."deliveryDate" = ${date}
+          AND o."deletedAt" IS NULL
+          AND o.status IN ('DELIVERED', 'PARTIAL')
+      `,
     ])
 
     // Enrich top customers with names
-    const customerIds = topCustomers.map(c => c.customerId)
+    const customerIds  = topCustomerRows.map(c => c.customerId)
     const customerNames = await prisma.customer.findMany({
       where:  { id: { in: customerIds } },
       select: { id: true, name: true, customerType: true },
     })
     const nameMap = Object.fromEntries(customerNames.map(c => [c.id, c]))
 
-    // Aggregate order totals across all statuses
     const totalOrders     = ordersByStatus.reduce((s, g) => s + g._count.id, 0)
-    const totalOrderedQty = ordersByStatus.reduce((s, g) => s + (g._sum.orderedQty ?? 0), 0)
-
-    // Revenue: sum(deliveredQty * pricePerUnit) requires raw because groupBy _sum can't multiply
-    const revenueRaw = await prisma.$queryRaw<{ total: number }[]>`
-      SELECT COALESCE(SUM("deliveredQty" * "pricePerUnit"), 0) AS total
-      FROM "Order"
-      WHERE "deliveryDate" = ${date}
-        AND "deletedAt" IS NULL
-        AND status IN ('DELIVERED', 'PARTIAL')
-    `
-    const grossRevenue = Number(revenueRaw[0]?.total ?? 0)
-
-    // Vehicle costs today
-    const costRaw = await prisma.$queryRaw<{ total: number }[]>`
-      SELECT COALESCE(SUM("fuelCost" + "driverCost" + "helperCost" + "maintenanceCost" + "depreciationCost"), 0) AS total
-      FROM "VehicleCost"
-      WHERE "date" = ${date}
-    `
-    const totalVehicleCost = Number(costRaw[0]?.total ?? 0)
+    const qtyData         = qtyRows[0] ?? { totalOrderedSak: 0, totalDeliveredSak: 0, totalReturnedSak: 0 }
+    const grossRevenue    = Number(revenueRaw[0]?.gross ?? 0)
+    const totalVehicleCost = Number(revenueRaw[0]?.cost ?? 0)
 
     return apiSuccess({
       date:      date.toISOString().slice(0, 10),
       orders: {
         total:           totalOrders,
-        totalOrderedQty,
+        totalOrderedQty: Number(qtyData.totalOrderedSak),
         byStatus:        Object.fromEntries(ordersByStatus.map(g => [g.status, g._count.id])),
-        totalDelivered:  orderRevenue._sum.deliveredQty ?? 0,
-        totalReturned:   orderRevenue._sum.returnedQty  ?? 0,
+        totalDelivered:  Number(qtyData.totalDeliveredSak),
+        totalReturned:   Number(qtyData.totalReturnedSak),
       },
       finance: {
         grossRevenue,
@@ -123,14 +136,14 @@ export async function GET(req: NextRequest) {
         activeCount: fleetCount,
       },
       warehouse: warehouseStock,
-      topCustomers: topCustomers.map(c => ({
+      topCustomers: topCustomerRows.map(c => ({
         ...nameMap[c.customerId],
-        totalDelivered: c._sum.deliveredQty ?? 0,
+        totalDelivered: Number(c.totalDeliveredSak),
       })),
       returnBreakdown: returnBreakdown.map(r => ({
-        reason:    r.returnReason ?? 'UNKNOWN',
-        count:     r._count.id,
-        totalQty:  r._sum.returnedQty ?? 0,
+        reason:   r.returnReason ?? 'UNKNOWN',
+        count:    r._count.id,
+        totalQty: r._sum.returnedQty ?? 0,
       })),
     })
   } catch (err) {
