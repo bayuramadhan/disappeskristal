@@ -203,7 +203,9 @@ export async function POST(req: NextRequest) {
         date:      new Date(order.deliveryDate),
         meta: {
           deliveredQty,
-          returnedQty:  returnedQty ?? 0,
+          returnedQty:    returnedQty ?? 0,
+          deliveredQtySak: Math.ceil(toSak(deliveredQty, unitsPerSak)),
+          returnedQtySak:  Math.ceil(toSak(returnedQty ?? 0, unitsPerSak)),
           returnReason: returnReason ?? null,
           orderStatus:  newOrderStatus,
           plateNumber:  vehicle.plateNumber,

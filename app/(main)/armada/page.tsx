@@ -287,8 +287,8 @@ function ActivityLogTab({ date, DatePicker }: { date: string; DatePicker: React.
                     <p className="text-sm">
                       <span className="font-medium">{meta.customerName}</span>
                       <span className="text-muted-foreground">
-                        {' '}— {meta.deliveredQty} sak terkirim
-                        {meta.returnedQty > 0 && `, ${meta.returnedQty} retur`}
+                        {' '}— {meta.deliveredQtySak ?? meta.deliveredQty} sak terkirim
+                        {(meta.returnedQtySak ?? meta.returnedQty) > 0 && `, ${meta.returnedQtySak ?? meta.returnedQty} sak retur`}
                         {' · '}
                       </span>
                       <span className="text-muted-foreground">Status → </span>
@@ -450,11 +450,12 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
   }
 
   function openDelivery(order: any) {
-    const alreadyLogged    = (order.vehicleDeliveredQty ?? 0) + (order.vehicleReturnedQty ?? 0)
-    const remaining        = (order.assignedQty ?? order.orderedQty) - alreadyLogged
-    const defaultDelivered = Math.max(0, remaining)
+    const ups           = order.uom?.unitsPerSak
+    const assignedSak   = qtyInSak(order.assignedQty ?? order.orderedQty, ups)
+    const alreadySak    = qtyInSak((order.vehicleDeliveredQty ?? 0) + (order.vehicleReturnedQty ?? 0), ups)
+    const remainingSak  = Math.max(0, assignedSak - alreadySak)
     setDelivTarget(order)
-    setDelivForm({ deliveredQty: String(defaultDelivered), returnedQty: '0', returnReason: '' })
+    setDelivForm({ deliveredQty: String(remainingSak), returnedQty: '0', returnReason: '' })
   }
 
   async function submitDelivery(e: React.FormEvent) {
@@ -469,8 +470,15 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
           orderId:      delivTarget.id,
           vehicleId:    armada.vehicleId,
           driverId:     armada.driverId,
-          deliveredQty: Number(delivForm.deliveredQty),
-          returnedQty:  Number(delivForm.returnedQty),
+          // input dalam sak → konversi ke raw unit untuk API
+          deliveredQty: Math.min(
+            Number(delivForm.deliveredQty) * (delivTarget.uom?.unitsPerSak ?? 1),
+            delivTarget.assignedQty ?? delivTarget.orderedQty,
+          ),
+          returnedQty: Math.min(
+            Number(delivForm.returnedQty) * (delivTarget.uom?.unitsPerSak ?? 1),
+            delivTarget.assignedQty ?? delivTarget.orderedQty,
+          ),
           returnReason: delivForm.returnReason || undefined,
         }),
       })
@@ -593,10 +601,10 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
                       <span className="text-muted-foreground ml-1">dari {qtyInSak(o.orderedQty, o.uom?.unitsPerSak)} sak total</span>
                     )}
                     {(o.vehicleDeliveredQty ?? 0) > 0 && (
-                      <span className="text-emerald-600 ml-2">· {o.vehicleDeliveredQty} terkirim</span>
+                      <span className="text-emerald-600 ml-2">· {qtyInSak(o.vehicleDeliveredQty, o.uom?.unitsPerSak)} sak terkirim</span>
                     )}
                     {(o.vehicleReturnedQty ?? 0) > 0 && (
-                      <span className="text-amber-600 ml-1">· {o.vehicleReturnedQty} retur</span>
+                      <span className="text-amber-600 ml-1">· {qtyInSak(o.vehicleReturnedQty, o.uom?.unitsPerSak)} sak retur</span>
                     )}
                     <span className="text-muted-foreground ml-2">
                       {formatCurrency((o.assignedQty ?? o.orderedQty) * o.pricePerUnit)}
@@ -648,8 +656,8 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
                 </p>
                 {(delivTarget?.vehicleDeliveredQty ?? 0) > 0 && (
                   <p className="text-emerald-600">
-                    Sudah dicatat armada ini: {delivTarget.vehicleDeliveredQty} terkirim
-                    {(delivTarget?.vehicleReturnedQty ?? 0) > 0 && ` · ${delivTarget.vehicleReturnedQty} retur`}
+                    Sudah dicatat armada ini: {qtyInSak(delivTarget.vehicleDeliveredQty, delivTarget.uom?.unitsPerSak)} sak terkirim
+                    {(delivTarget?.vehicleReturnedQty ?? 0) > 0 && ` · ${qtyInSak(delivTarget.vehicleReturnedQty, delivTarget.uom?.unitsPerSak)} sak retur`}
                   </p>
                 )}
               </div>
@@ -661,15 +669,17 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
                   <Input
                     type="number" min={0}
                     max={delivTarget ? Math.max(0,
-                      (delivTarget.assignedQty ?? delivTarget.orderedQty) -
-                      ((delivTarget.vehicleDeliveredQty ?? 0) + (delivTarget.vehicleReturnedQty ?? 0))
+                      qtyInSak(delivTarget.assignedQty ?? delivTarget.orderedQty, delivTarget.uom?.unitsPerSak) -
+                      qtyInSak((delivTarget.vehicleDeliveredQty ?? 0) + (delivTarget.vehicleReturnedQty ?? 0), delivTarget.uom?.unitsPerSak)
                     ) : undefined}
                     value={delivForm.deliveredQty}
                     onChange={e => {
+                      const ups         = delivTarget?.uom?.unitsPerSak
+                      const assignedSak = qtyInSak(delivTarget?.assignedQty ?? delivTarget?.orderedQty ?? 0, ups)
+                      const alreadySak  = qtyInSak((delivTarget?.vehicleDeliveredQty ?? 0) + (delivTarget?.vehicleReturnedQty ?? 0), ups)
+                      const remainSak   = Math.max(0, assignedSak - alreadySak)
                       const terkirim    = Number(e.target.value)
-                      const alreadyDone = (delivTarget?.vehicleDeliveredQty ?? 0) + (delivTarget?.vehicleReturnedQty ?? 0)
-                      const assignedQty = (delivTarget?.assignedQty ?? delivTarget?.orderedQty ?? 0) - alreadyDone
-                      const retur = Math.max(0, assignedQty - terkirim)
+                      const retur       = Math.max(0, remainSak - terkirim)
                       setDelivForm(f => ({ ...f, deliveredQty: e.target.value, returnedQty: String(retur) }))
                     }}
                     placeholder="0" required autoFocus

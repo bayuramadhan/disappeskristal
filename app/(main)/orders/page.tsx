@@ -933,7 +933,7 @@ const { canWrite, isAdmin } = useRole()
                                 <span>{log.driver?.name ?? '-'}</span>
                                 <span className="text-muted-foreground">{log.timestamp ? format(new Date(log.timestamp), 'dd/MM HH:mm') : '-'}</span>
                               </div>
-                              <p className="mt-1">Terkirim: <span className="font-medium">{log.deliveredQty} sak</span> | Retur: <span className="font-medium">{log.returnedQty} sak</span></p>
+                              <p className="mt-1">Terkirim: <span className="font-medium">{Math.ceil((log.deliveredQty ?? 0) / (o.uom?.unitsPerSak ?? 1))} sak</span> | Retur: <span className="font-medium">{Math.ceil((log.returnedQty ?? 0) / (o.uom?.unitsPerSak ?? 1))} sak</span></p>
                               {log.returnReason && <p className="text-muted-foreground mt-0.5">Alasan: {log.returnReason}</p>}
                             </div>
                           ))}
