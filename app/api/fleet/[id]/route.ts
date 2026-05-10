@@ -8,7 +8,7 @@ type Params = { params: { id: string } }
 
 // ─── PATCH /api/fleet/[id] ────────────────────────────────────────────────────
 export async function PATCH(req: NextRequest, { params }: Params) {
-  const { error } = await requireAuth()
+  const { user, error } = await requireAuth()
   if (error) return error
 
   try {
@@ -46,6 +46,30 @@ export async function PATCH(req: NextRequest, { params }: Params) {
         rayon:   { select: { id: true, name: true } },
       },
     })
+
+    // Tulis activity log: catat field mana saja yang berubah (non-blocking)
+    const changes: Record<string, { from: string | null; to: string | null }> = {}
+    if (driverId      !== undefined && driverId      !== existing.driverId)      changes.driverId      = { from: existing.driverId ?? null,               to: driverId ?? null }
+    if (rayonId       !== undefined && rayonId       !== existing.rayonId)       changes.rayonId       = { from: existing.rayonId ?? null,                 to: rayonId ?? null }
+    if (helperName    !== undefined && helperName    !== existing.helperName)     changes.helperName    = { from: existing.helperName ?? null,              to: helperName ?? null }
+    if (departureTime !== undefined)                                              changes.departureTime = { from: existing.departureTime?.toISOString() ?? null, to: departureTime ?? null }
+    if (activeStatus  !== undefined && activeStatus  !== existing.activeStatus)  changes.activeStatus  = { from: String(existing.activeStatus),            to: String(activeStatus) }
+
+    const actMeta: Record<string, unknown> = {
+      plateNumber: updated.vehicle?.plateNumber ?? null,
+      changes,
+    }
+    prisma.activityLog.create({
+      data: {
+        action:    'FLEET_UPDATED',
+        userId:    user!.id,
+        userName:  user!.name,
+        userEmail: user!.email,
+        vehicleId: existing.vehicleId,
+        date:      existing.date,
+        meta:      actMeta as any,
+      },
+    }).catch(() => null)
 
     return apiSuccess(updated, 'Status armada berhasil diperbarui')
   } catch (err) {

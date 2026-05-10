@@ -74,7 +74,7 @@ export async function GET(req: NextRequest) {
 
 // ─── POST /api/delivery-logs ──────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
-  const { error } = await requireAuth()
+  const { user, error } = await requireAuth()
   if (error) return error
 
   try {
@@ -88,7 +88,8 @@ export async function POST(req: NextRequest) {
 
     // Validate order exists and isn't already finalised
     const order = await prisma.order.findFirst({
-      where: { id: orderId, deletedAt: null },
+      where:  { id: orderId, deletedAt: null },
+      include: { customer: { select: { id: true, name: true } } },
     })
     if (!order) return apiNotFound('Order')
 
@@ -181,6 +182,28 @@ export async function POST(req: NextRequest) {
         }),
       ] : []),
     ])
+
+    // Tulis activity log (non-blocking)
+    prisma.activityLog.create({
+      data: {
+        action:    'DELIVERY_LOGGED',
+        userId:    user!.id,
+        userName:  user!.name,
+        userEmail: user!.email,
+        vehicleId,
+        orderId,
+        date:      new Date(order.deliveryDate),
+        meta: {
+          deliveredQty,
+          returnedQty:  returnedQty ?? 0,
+          returnReason: returnReason ?? null,
+          orderStatus:  newOrderStatus,
+          plateNumber:  vehicle.plateNumber,
+          customerName: order.customer?.name,
+          orderNumber:  order.orderNumber,
+        } as any,
+      },
+    }).catch(() => null)
 
     // Sync warehouse stock: deliveredQty goes out, returnedQty comes back
     const stockDate = new Date(order.deliveryDate)

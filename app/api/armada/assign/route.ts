@@ -8,7 +8,7 @@ import { apiSuccess, apiError, apiNotFound, apiServerError } from '@/lib/api/res
 // Unassign: { orderId, vehicleId, qty: 0 }   → hapus alokasi vehicle ini
 // Unassign all: { orderId, vehicleId: null } → hapus semua alokasi
 export async function POST(req: NextRequest) {
-  const { error } = await requireAuth()
+  const { user, error } = await requireAuth()
   if (error) return error
 
   try {
@@ -19,6 +19,8 @@ export async function POST(req: NextRequest) {
       where:  { id: orderId, deletedAt: null },
       select: {
         id: true, orderedQty: true, status: true, vehicleId: true, deliveryDate: true,
+        orderNumber: true,
+        customer: { select: { id: true, name: true } },
         vehicleAssignments: {
           where:  { deletedAt: null },
           select: { id: true, vehicleId: true, qty: true },
@@ -30,6 +32,22 @@ export async function POST(req: NextRequest) {
     const finalStatuses = ['DELIVERED', 'CANCELLED', 'REJECTED', 'RETURNED']
     if (finalStatuses.includes(order.status)) {
       return apiError(`Pesanan berstatus ${order.status} tidak dapat diubah`, 409)
+    }
+
+    // ── Helper: tulis activity log (non-blocking) ─────────────────────────────
+    const logActivity = (action: 'ORDER_ASSIGNED' | 'ORDER_UNASSIGNED', vid: string | null, meta: Record<string, unknown>) => {
+      prisma.activityLog.create({
+        data: {
+          action,
+          userId:    user!.id,
+          userName:  user!.name,
+          userEmail: user!.email,
+          vehicleId: vid ?? undefined,
+          orderId,
+          date:      order!.deliveryDate,
+          meta:      meta as any,
+        },
+      }).catch(() => null)
     }
 
     // ── UNASSIGN ALL ──────────────────────────────────────────────────────────
@@ -47,11 +65,18 @@ export async function POST(req: NextRequest) {
         select: { id: true, orderNumber: true, status: true, vehicleId: true, orderedQty: true,
                   customer: { select: { id: true, name: true } } },
       })
+      logActivity('ORDER_UNASSIGNED', null, {
+        orderNumber:  order.orderNumber,
+        customerName: order.customer.name,
+        note:         'dikeluarkan dari semua armada',
+      })
       return apiSuccess(updated, 'Pesanan dikeluarkan dari semua armada')
     }
 
     // ── UNASSIGN SPECIFIC VEHICLE (qty = 0) ───────────────────────────────────
     if (qty === 0) {
+      // Ambil plateNumber untuk meta
+      const veh = await prisma.vehicle.findFirst({ where: { id: vehicleId }, select: { plateNumber: true } })
       await prisma.orderVehicleAssignment.updateMany({
         where: { orderId, vehicleId, deletedAt: null },
         data:  { deletedAt: new Date() },
@@ -69,6 +94,11 @@ export async function POST(req: NextRequest) {
         data:  { vehicleId: newVehicleId, status: newStatus as any },
         select: { id: true, orderNumber: true, status: true, vehicleId: true,
                   customer: { select: { id: true, name: true } } },
+      })
+      logActivity('ORDER_UNASSIGNED', vehicleId, {
+        orderNumber:  order.orderNumber,
+        customerName: order.customer.name,
+        plateNumber:  veh?.plateNumber,
       })
       return apiSuccess(updated, 'Pesanan dikeluarkan dari armada')
     }
@@ -144,6 +174,12 @@ export async function POST(req: NextRequest) {
       },
     })
 
+    logActivity('ORDER_ASSIGNED', vehicleId, {
+      orderNumber:  order.orderNumber,
+      customerName: order.customer.name,
+      plateNumber:  vehicle.plateNumber,
+      qty,
+    })
     return apiSuccess(updated, `${qty} sak dialokasikan ke armada`)
   } catch (err) {
     return apiServerError(err)

@@ -112,6 +112,7 @@ model Vehicle {
   vehicleCosts        VehicleCost[]
   vehicleMaintenances VehicleMaintenance[]
   orderAssignments    OrderVehicleAssignment[]
+  activityLogs        ActivityLog[]
 }
 
 enum VehicleStatus {
@@ -284,8 +285,9 @@ model Order {
   deliveryLocation CustomerLocation? @relation(fields: [deliveryLocationId], references: [id])
   vehicle          Vehicle?          @relation(fields: [vehicleId], references: [id])
   rayon            Rayon?            @relation(fields: [rayonId], references: [id])
-  deliveryLogs     DeliveryLog[]
+  deliveryLogs       DeliveryLog[]
   vehicleAssignments OrderVehicleAssignment[]
+  activityLogs       ActivityLog[]
 
   @@index([deliveryDate, status])
   @@index([customerId])
@@ -524,6 +526,37 @@ model VehicleMaintenance {
 }
 
 // ==================== WA DRAFT ====================
+
+// ==================== ACTIVITY LOG ====================
+
+enum ActivityAction {
+  ORDER_ASSIGNED    // pesanan dimasukkan ke armada
+  ORDER_UNASSIGNED  // pesanan dikeluarkan dari armada
+  DELIVERY_LOGGED   // pengiriman dicatat
+  FLEET_UPDATED     // data armada harian diubah (driver/rayon/helper/jam berangkat)
+}
+
+model ActivityLog {
+  id        String         @id @default(cuid())
+  timestamp DateTime       @default(now())
+  userId    String?
+  userName  String?
+  userEmail String?
+  action    ActivityAction
+  vehicleId String?
+  orderId   String?
+  date      DateTime?      // tanggal pengiriman terkait — untuk filter per hari
+
+  /// konteks tambahan: qty, plateNumber, customerName, orderNumber, perubahan field, dll
+  meta      Json?
+
+  vehicle   Vehicle? @relation(fields: [vehicleId], references: [id])
+  order     Order?   @relation(fields: [orderId],   references: [id])
+
+  @@index([date])
+  @@index([timestamp])
+  @@index([vehicleId])
+}
 
 model WaDraft {
   id                 String    @id @default(cuid())

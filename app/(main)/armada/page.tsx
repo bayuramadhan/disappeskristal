@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react'
 import { format } from 'date-fns'
 import {
   Truck, User, Package, Clock, Plus, X, Settings2, CheckCircle2,
-  Navigation2, ArrowRightLeft,
+  Navigation2, LogIn, LogOut, ClipboardCheck, Wrench,
 } from 'lucide-react'
 import useSWR from 'swr'
 import { fetcher } from '@/lib/fetcher'
@@ -22,12 +22,144 @@ import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
 import { Progress } from '@/components/ui/progress'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { useRole } from '@/hooks/useRole'
 import { useToast } from '@/hooks/use-toast'
 import { useRayons } from '@/hooks/useCustomers'
 import { formatCurrency } from '@/lib/utils'
+
+// ─── ActivityLog: audit trail semua aksi operator di menu Pengiriman ────────
+const ACTION_CONFIG: Record<string, {
+  label: string; color: string; bg: string; icon: React.ReactNode
+}> = {
+  ORDER_ASSIGNED:   { label: 'Masukkan Pesanan', color: 'text-sky-700',     bg: 'bg-sky-50 border-sky-200',     icon: <LogIn className="h-4 w-4 text-sky-600" /> },
+  ORDER_UNASSIGNED: { label: 'Keluarkan Pesanan', color: 'text-amber-700',  bg: 'bg-amber-50 border-amber-200', icon: <LogOut className="h-4 w-4 text-amber-600" /> },
+  DELIVERY_LOGGED:  { label: 'Catat Pengiriman',  color: 'text-emerald-700', bg: 'bg-emerald-50 border-emerald-200', icon: <ClipboardCheck className="h-4 w-4 text-emerald-600" /> },
+  FLEET_UPDATED:    { label: 'Ubah Data Armada',  color: 'text-violet-700', bg: 'bg-violet-50 border-violet-200', icon: <Wrench className="h-4 w-4 text-violet-600" /> },
+}
+
+const CHANGE_LABELS: Record<string, string> = {
+  driverId:      'Driver',
+  rayonId:       'Rayon',
+  helperName:    'Helper',
+  departureTime: 'Jam berangkat',
+  activeStatus:  'Status aktif',
+}
+
+function ActivityLogTab({ date, DatePicker }: { date: string; DatePicker: React.ReactNode }) {
+  const { data, isLoading, mutate } = useSWR(
+    `/api/activity-logs?date=${date}&limit=100`,
+    fetcher,
+    { refreshInterval: 15_000 },   // auto-refresh setiap 15 detik
+  )
+  const logs: any[] = data?.data ?? data ?? []
+
+  return (
+    <div>
+      {DatePicker}
+
+      <div className="flex items-center justify-between mb-4">
+        <p className="text-sm text-muted-foreground">
+          {isLoading ? 'Memuat...' : `${logs.length} aktivitas`}
+        </p>
+        <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5" onClick={() => mutate()}>
+          <Clock className="h-3.5 w-3.5" /> Refresh
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <LoadingState rows={5} />
+      ) : logs.length === 0 ? (
+        <EmptyState
+          title="Belum ada aktivitas"
+          description="Aktivitas operator di menu Pengiriman akan tercatat di sini secara otomatis."
+        />
+      ) : (
+        <div className="space-y-2">
+          {logs.map((log: any) => {
+            const cfg  = ACTION_CONFIG[log.action] ?? ACTION_CONFIG.FLEET_UPDATED
+            const meta = log.meta ?? {}
+            return (
+              <div key={log.id} className={`flex gap-3 rounded-lg border p-3 ${cfg.bg}`}>
+                {/* Icon */}
+                <div className="mt-0.5 shrink-0">{cfg.icon}</div>
+
+                {/* Body */}
+                <div className="flex-1 min-w-0 space-y-0.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-sm font-semibold ${cfg.color}`}>{cfg.label}</span>
+                    {log.vehicle && (
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
+                        <Truck className="h-3 w-3" />{log.vehicle.plateNumber}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Detail per action */}
+                  {log.action === 'ORDER_ASSIGNED' && (
+                    <p className="text-sm">
+                      <span className="font-medium">{meta.customerName}</span>
+                      <span className="text-muted-foreground"> — {meta.qty} sak → {meta.plateNumber}</span>
+                    </p>
+                  )}
+                  {log.action === 'ORDER_UNASSIGNED' && (
+                    <p className="text-sm">
+                      <span className="font-medium">{meta.customerName}</span>
+                      {meta.plateNumber
+                        ? <span className="text-muted-foreground"> dikeluarkan dari {meta.plateNumber}</span>
+                        : <span className="text-muted-foreground"> dikeluarkan dari semua armada</span>
+                      }
+                    </p>
+                  )}
+                  {log.action === 'DELIVERY_LOGGED' && (
+                    <p className="text-sm">
+                      <span className="font-medium">{meta.customerName}</span>
+                      <span className="text-muted-foreground">
+                        {' '}— {meta.deliveredQty} sak terkirim
+                        {meta.returnedQty > 0 && `, ${meta.returnedQty} retur`}
+                        {' · '}
+                      </span>
+                      <span className="text-muted-foreground">Status → </span>
+                      <span className="font-medium">{meta.orderStatus}</span>
+                    </p>
+                  )}
+                  {log.action === 'FLEET_UPDATED' && meta.changes && (
+                    <div className="space-y-0.5">
+                      {Object.entries(meta.changes as Record<string, any>).map(([field, val]) => (
+                        <p key={field} className="text-sm text-muted-foreground">
+                          {CHANGE_LABELS[field] ?? field} diubah
+                          {val.from != null && <span className="line-through mx-1 opacity-60">{String(val.from)}</span>}
+                          {val.to   != null && <span className="font-medium text-foreground ml-1">{String(val.to)}</span>}
+                        </p>
+                      ))}
+                      {Object.keys(meta.changes).length === 0 && (
+                        <p className="text-sm text-muted-foreground">Tidak ada perubahan</p>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Order number & no. pesanan */}
+                  {meta.orderNumber && (
+                    <p className="text-xs text-muted-foreground font-mono">{meta.orderNumber}</p>
+                  )}
+                </div>
+
+                {/* Timestamp & operator */}
+                <div className="shrink-0 text-right space-y-0.5">
+                  <p className="text-xs font-mono text-muted-foreground">
+                    {format(new Date(log.timestamp), 'HH:mm:ss')}
+                  </p>
+                  {log.userName && (
+                    <p className="text-xs text-muted-foreground">{log.userName}</p>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ─── SlotSheet: kelola pesanan dalam 1 armada ────────────────────────────────
 function SlotSheet({ armada, date, open, onClose, onRefresh }: {
@@ -717,147 +849,7 @@ export default function PengirimanPage() {
 
         {/* ══ TAB: LOG HARIAN ══════════════════════════════════════════════════ */}
         <TabsContent value="log">
-          {DatePicker}
-          {fleetLoading ? (
-            <LoadingState rows={5} />
-          ) : fleet.length === 0 ? (
-            <EmptyState
-              title="Tidak ada armada aktif"
-              description="Tidak ada data pengiriman untuk tanggal ini."
-            />
-          ) : (
-            <div className="rounded-md border">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>Kendaraan</TableHead>
-                    <TableHead>Driver</TableHead>
-                    <TableHead>Helper</TableHead>
-                    <TableHead>Rayon</TableHead>
-                    <TableHead>Jam Berangkat</TableHead>
-                    <TableHead className="text-right">Pesanan</TableHead>
-                    <TableHead className="text-right">Terkirim</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {fleet.map((f: any) => {
-                    // Deteksi perubahan: bandingkan ID aktual vs master
-                    const driverChanged = f.masterArmadaDriverId && f.driverId !== f.masterArmadaDriverId
-                    const rayonChanged  = f.masterArmadaRayonId  && f.rayonId  !== f.masterArmadaRayonId
-                    const helperChanged = f.masterArmadaHelper !== null &&
-                                         (f.helperName ?? '') !== (f.masterArmadaHelper ?? '')
-
-                    const deliveredCount = f.orders?.filter((o: any) =>
-                      ['DELIVERED', 'PARTIAL'].includes(o.status)
-                    ).length ?? 0
-
-                    return (
-                      <TableRow key={f.id}>
-                        {/* Kendaraan */}
-                        <TableCell>
-                          <span className="flex items-center gap-1.5 font-mono font-medium text-sm">
-                            <Truck className="h-3.5 w-3.5 text-muted-foreground" />
-                            {f.vehicle?.plateNumber}
-                          </span>
-                          <span className="text-xs text-muted-foreground">{f.vehicle?.capacitySak} sak</span>
-                        </TableCell>
-
-                        {/* Driver — highlight jika berbeda dari master */}
-                        <TableCell>
-                          {driverChanged ? (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="flex items-center gap-1 text-amber-600 font-medium text-sm cursor-default">
-                                    <ArrowRightLeft className="h-3 w-3 shrink-0" />
-                                    {f.driver?.name ?? '—'}
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                  <p className="text-xs">Default driver berbeda dari hari ini</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          ) : (
-                            <span className="text-sm">{f.driver?.name ?? '—'}</span>
-                          )}
-                        </TableCell>
-
-                        {/* Helper */}
-                        <TableCell>
-                          {helperChanged ? (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="flex items-center gap-1 text-amber-600 font-medium text-sm cursor-default">
-                                    <ArrowRightLeft className="h-3 w-3 shrink-0" />
-                                    {f.helperName || '—'}
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                  <p className="text-xs">Default: {f.masterArmadaHelper || '(tidak ada)'}</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          ) : (
-                            <span className="text-sm text-muted-foreground">{f.helperName || '—'}</span>
-                          )}
-                        </TableCell>
-
-                        {/* Rayon */}
-                        <TableCell>
-                          {rayonChanged ? (
-                            <TooltipProvider>
-                              <Tooltip>
-                                <TooltipTrigger asChild>
-                                  <span className="flex items-center gap-1 text-amber-600 font-medium text-sm cursor-default">
-                                    <ArrowRightLeft className="h-3 w-3 shrink-0" />
-                                    {f.rayon?.name ?? '—'}
-                                  </span>
-                                </TooltipTrigger>
-                                <TooltipContent side="top">
-                                  <p className="text-xs">Rayon default berbeda dari hari ini</p>
-                                </TooltipContent>
-                              </Tooltip>
-                            </TooltipProvider>
-                          ) : (
-                            <span className="text-sm">{f.rayon?.name ?? '—'}</span>
-                          )}
-                        </TableCell>
-
-                        {/* Jam berangkat */}
-                        <TableCell className="text-sm text-muted-foreground">
-                          {f.departureTime
-                            ? format(new Date(f.departureTime), 'HH:mm')
-                            : <span className="italic">—</span>}
-                        </TableCell>
-
-                        {/* Jumlah pesanan */}
-                        <TableCell className="text-right">
-                          <span className="font-semibold text-sm">{f.stats?.totalOrders ?? 0}</span>
-                          <span className="text-xs text-muted-foreground ml-1">({f.stats?.totalAssigned ?? 0} sak)</span>
-                        </TableCell>
-
-                        {/* Terkirim */}
-                        <TableCell className="text-right">
-                          <span className={`font-semibold text-sm ${deliveredCount === f.stats?.totalOrders && deliveredCount > 0 ? 'text-emerald-600' : ''}`}>
-                            {deliveredCount}/{f.stats?.totalOrders ?? 0}
-                          </span>
-                        </TableCell>
-
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
-          )}
-
-          {/* Keterangan perubahan */}
-          <p className="text-xs text-muted-foreground mt-3 flex items-center gap-1.5">
-            <ArrowRightLeft className="h-3 w-3 text-amber-500" />
-            Ikon oranye menandakan perubahan dari default master armada pada hari ini.
-          </p>
+          <ActivityLogTab date={date} DatePicker={DatePicker} />
         </TabsContent>
       </Tabs>
 
