@@ -104,6 +104,29 @@ export async function POST(req: NextRequest) {
     if (!vehicle) return apiError('Kendaraan tidak ditemukan', 404)
     if (!driver)  return apiError('Driver tidak ditemukan', 404)
 
+    // ── Guard: per-vehicle assignment cap ─────────────────────────────────────
+    // Jika ada OrderVehicleAssignment untuk vehicle ini, total log (delivered+returned)
+    // tidak boleh melebihi qty yang dialokasikan ke vehicle ini.
+    const assignment = await prisma.orderVehicleAssignment.findFirst({
+      where: { orderId, vehicleId, deletedAt: null },
+    })
+    if (assignment) {
+      const existingLogs = await prisma.deliveryLog.aggregate({
+        where: { orderId, vehicleId },
+        _sum:  { deliveredQty: true, returnedQty: true },
+      })
+      const alreadyDelivered = existingLogs._sum.deliveredQty ?? 0
+      const alreadyReturned  = existingLogs._sum.returnedQty  ?? 0
+      const alreadyLogged    = alreadyDelivered + alreadyReturned
+      const newTotal         = alreadyLogged + deliveredQty + (returnedQty ?? 0)
+      if (newTotal > assignment.qty) {
+        return apiError(
+          `Melebihi alokasi armada ini. Alokasi: ${assignment.qty} sak, sudah tercatat: ${alreadyLogged} sak`,
+          400,
+        )
+      }
+    }
+
     // Accumulate qty across multiple delivery logs (for PARTIAL orders)
     const totalDelivered = (order.deliveredQty ?? 0) + deliveredQty
     const totalReturned  = (order.returnedQty  ?? 0) + (returnedQty ?? 0)

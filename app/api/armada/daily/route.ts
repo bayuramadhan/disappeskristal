@@ -105,14 +105,34 @@ export async function GET(req: NextRequest) {
           orderBy: { createdAt: 'asc' },
         })
 
+        // Aggregate delivery logs per orderId untuk vehicle ini
+        const orderIds = assignments.map(a => a.orderId)
+        const vehicleLogs = orderIds.length > 0
+          ? await prisma.deliveryLog.groupBy({
+              by:    ['orderId'],
+              where: { vehicleId: f.vehicleId, orderId: { in: orderIds } },
+              _sum:  { deliveredQty: true, returnedQty: true },
+            })
+          : []
+        const vehicleLogMap = new Map(vehicleLogs.map(l => [l.orderId, l._sum]))
+
         // Transform: setiap assignment → baris order enriched dengan assignedQty
-        const orders = assignments.map(a => ({
-          ...a.order,
-          assignedQty:    a.qty,          // qty yang dialokasikan ke vehicle INI
-          assignmentId:   a.id,
-          isSplit:        a.order.orderedQty !== a.qty,  // true jika pesanan dibagi
-          totalAllocated: a.order.vehicleAssignments.reduce((s, x) => s + x.qty, 0),
-        }))
+        const orders = assignments.map(a => {
+          const vLog               = vehicleLogMap.get(a.orderId)
+          const vehicleDeliveredQty = vLog?.deliveredQty ?? 0
+          const vehicleReturnedQty  = vLog?.returnedQty  ?? 0
+          const vehicleFullyLogged  = (vehicleDeliveredQty + vehicleReturnedQty) >= a.qty
+          return {
+            ...a.order,
+            assignedQty:        a.qty,          // qty yang dialokasikan ke vehicle INI
+            assignmentId:       a.id,
+            isSplit:            a.order.orderedQty !== a.qty,  // true jika pesanan dibagi
+            totalAllocated:     a.order.vehicleAssignments.reduce((s, x) => s + x.qty, 0),
+            vehicleDeliveredQty,                // sudah terkirim oleh vehicle INI
+            vehicleReturnedQty,                 // sudah diretur oleh vehicle INI
+            vehicleFullyLogged,                 // true → jatah armada ini sudah dicatat semua
+          }
+        })
 
         const totalAssigned  = assignments.reduce((s, a) => s + a.qty, 0)
         const totalDelivered = orders.reduce((s, o) => s + (o.deliveredQty ?? 0), 0)

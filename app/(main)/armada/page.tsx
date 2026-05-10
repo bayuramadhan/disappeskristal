@@ -92,8 +92,9 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
   }
 
   function openDelivery(order: any) {
-    const sisaQty = order.orderedQty - (order.deliveredQty ?? 0)
-    const defaultDelivered = Math.min(order.assignedQty ?? order.orderedQty, sisaQty > 0 ? sisaQty : order.orderedQty)
+    const alreadyLogged    = (order.vehicleDeliveredQty ?? 0) + (order.vehicleReturnedQty ?? 0)
+    const remaining        = (order.assignedQty ?? order.orderedQty) - alreadyLogged
+    const defaultDelivered = Math.max(0, remaining)
     setDelivTarget(order)
     setDelivForm({ deliveredQty: String(defaultDelivered), returnedQty: '0', returnReason: '' })
   }
@@ -188,6 +189,11 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
                     {o.isSplit && (
                       <Badge variant="warning" className="text-xs h-4 px-1">Split</Badge>
                     )}
+                    {o.vehicleFullyLogged && (
+                      <Badge variant="success" className="text-xs h-4 px-1 gap-0.5">
+                        <CheckCircle2 className="h-3 w-3" /> Selesai
+                      </Badge>
+                    )}
                   </div>
                   <p className="text-xs text-muted-foreground truncate mt-0.5">
                     {o.deliveryLocation?.namaLokasi ?? '—'}{o.rayon ? ` · ${o.rayon.name}` : ''}
@@ -197,6 +203,12 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
                     {o.isSplit && (
                       <span className="text-muted-foreground ml-1">dari {o.orderedQty} sak total</span>
                     )}
+                    {(o.vehicleDeliveredQty ?? 0) > 0 && (
+                      <span className="text-emerald-600 ml-2">· {o.vehicleDeliveredQty} terkirim</span>
+                    )}
+                    {(o.vehicleReturnedQty ?? 0) > 0 && (
+                      <span className="text-amber-600 ml-1">· {o.vehicleReturnedQty} retur</span>
+                    )}
                     <span className="text-muted-foreground ml-2">
                       {formatCurrency((o.assignedQty ?? o.orderedQty) * o.pricePerUnit)}
                     </span>
@@ -204,10 +216,12 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
                 </div>
                 {canWrite && !['DELIVERED', 'CANCELLED', 'REJECTED', 'RETURNED'].includes(o.status) && (
                   <div className="flex flex-col gap-1 shrink-0">
-                    <Button size="sm" variant="default" className="h-7 text-xs px-2"
-                      onClick={() => openDelivery(o)}>
-                      Catat
-                    </Button>
+                    {!o.vehicleFullyLogged && (
+                      <Button size="sm" variant="default" className="h-7 text-xs px-2"
+                        onClick={() => openDelivery(o)}>
+                        Catat
+                      </Button>
+                    )}
                     <Button size="icon" variant="ghost" className="h-7 w-7 text-muted-foreground hover:text-destructive"
                       disabled={assigning === o.id} onClick={() => unassign(o)}>
                       <X className="h-3.5 w-3.5" />
@@ -243,8 +257,11 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
                     <span className="ml-1 text-amber-600">(dari {delivTarget?.orderedQty} sak total)</span>
                   )}
                 </p>
-                {(delivTarget?.deliveredQty ?? 0) > 0 && (
-                  <p className="text-emerald-600">Sudah terkirim sebelumnya: {delivTarget.deliveredQty} sak</p>
+                {(delivTarget?.vehicleDeliveredQty ?? 0) > 0 && (
+                  <p className="text-emerald-600">
+                    Sudah dicatat armada ini: {delivTarget.vehicleDeliveredQty} terkirim
+                    {(delivTarget?.vehicleReturnedQty ?? 0) > 0 && ` · ${delivTarget.vehicleReturnedQty} retur`}
+                  </p>
                 )}
               </div>
             </DialogHeader>
@@ -254,11 +271,15 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
                   <Label>Terkirim (sak) <span className="text-destructive">*</span></Label>
                   <Input
                     type="number" min={0}
-                    max={delivTarget ? delivTarget.orderedQty - (delivTarget.deliveredQty ?? 0) : undefined}
+                    max={delivTarget ? Math.max(0,
+                      (delivTarget.assignedQty ?? delivTarget.orderedQty) -
+                      ((delivTarget.vehicleDeliveredQty ?? 0) + (delivTarget.vehicleReturnedQty ?? 0))
+                    ) : undefined}
                     value={delivForm.deliveredQty}
                     onChange={e => {
-                      const terkirim = Number(e.target.value)
-                      const assignedQty = delivTarget?.assignedQty ?? delivTarget?.orderedQty ?? 0
+                      const terkirim    = Number(e.target.value)
+                      const alreadyDone = (delivTarget?.vehicleDeliveredQty ?? 0) + (delivTarget?.vehicleReturnedQty ?? 0)
+                      const assignedQty = (delivTarget?.assignedQty ?? delivTarget?.orderedQty ?? 0) - alreadyDone
                       const retur = Math.max(0, assignedQty - terkirim)
                       setDelivForm(f => ({ ...f, deliveredQty: e.target.value, returnedQty: String(retur) }))
                     }}
