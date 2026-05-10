@@ -14,6 +14,7 @@ export async function GET() {
         customer:         { select: { id: true, name: true, customerType: true } },
         deliveryLocation: { select: { id: true, namaLokasi: true, alamat: true,
                                       rayon: { select: { id: true, name: true } } } },
+        uom:              { select: { id: true, abbreviation: true, unitsPerSak: true } },
       },
     })
     return apiSuccess(drafts)

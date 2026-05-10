@@ -273,7 +273,7 @@ function DraftCard({ draft, customers, today, onPublish, onDelete, isReviewing, 
       <div className="flex gap-2 text-xs text-muted-foreground flex-wrap">
         {draft.sender && <span className="bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">📱 {draft.sender}</span>}
         {draft.customerNameHint && <span className="bg-muted px-1.5 py-0.5 rounded">👤 {draft.customerNameHint}</span>}
-        {draft.orderedQty && <span className="bg-muted px-1.5 py-0.5 rounded">📦 {draft.orderedQty} sak</span>}
+        {draft.orderedQty && <span className="bg-muted px-1.5 py-0.5 rounded">📦 {draft.orderedQty} {draft.uom?.abbreviation ?? 'sak'}</span>}
         {draft.deliveryDate && <span className="bg-muted px-1.5 py-0.5 rounded">📅 {draft.deliveryDate}</span>}
       </div>
       <Button size="sm" variant="outline" className="w-full h-7 text-xs" onClick={onReview}>
