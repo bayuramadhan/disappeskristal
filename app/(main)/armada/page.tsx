@@ -9,6 +9,12 @@ import {
 } from 'lucide-react'
 import useSWR from 'swr'
 import { fetcher } from '@/lib/fetcher'
+import { toSak } from '@/lib/uom'
+
+// Konversi qty pesanan ke sak, dibulatkan ke atas
+function qtyInSak(qty: number, unitsPerSak?: number | null): number {
+  return Math.ceil(toSak(qty, unitsPerSak))
+}
 import { PageHeader } from '@/components/shared/PageHeader'
 import { LoadingCards, LoadingState } from '@/components/shared/LoadingState'
 import { EmptyState } from '@/components/shared/EmptyState'
@@ -145,14 +151,14 @@ function OrderQueuePanel({ date, onRefreshFleet }: { date: string; onRefreshFlee
                             <span className="text-xs text-muted-foreground">{o.rayon?.name ?? o.deliveryLocation?.namaLokasi ?? '—'}</span>
                           </td>
                           <td className="px-4 py-2.5 text-right font-semibold tabular-nums">
-                            {o.orderedQty} {o.uom?.abbreviation ?? 'sak'}
+                            {qtyInSak(o.orderedQty, o.uom?.unitsPerSak)} sak
                           </td>
                           <td className="px-4 py-2.5 text-right hidden sm:table-cell tabular-nums">
                             {isUnassigned ? (
                               <span className="text-muted-foreground text-xs">—</span>
                             ) : (
                               <span className={isPartial ? 'text-amber-700' : 'text-emerald-700'}>
-                                {totalAllocated} / {o.orderedQty} {o.uom?.abbreviation ?? 'sak'}
+                                {totalAllocated} / {qtyInSak(o.orderedQty, o.uom?.unitsPerSak)} sak
                               </span>
                             )}
                           </td>
@@ -176,7 +182,7 @@ function OrderQueuePanel({ date, onRefreshFleet }: { date: string; onRefreshFlee
                                 </span>
                               </div>
                               {!isFull && remaining > 0 && (
-                                <p className="text-xs text-muted-foreground">sisa {remaining} {o.uom?.abbreviation ?? 'sak'}</p>
+                                <p className="text-xs text-muted-foreground">sisa {qtyInSak(remaining, o.uom?.unitsPerSak)} sak</p>
                               )}
                             </div>
                           </td>
@@ -558,9 +564,9 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
                     {o.deliveryLocation?.namaLokasi ?? '—'}{o.rayon ? ` · ${o.rayon.name}` : ''}
                   </p>
                   <p className="text-xs mt-1">
-                    <span className="font-semibold">{o.assignedQty ?? o.orderedQty} {o.uom?.abbreviation ?? 'sak'}</span>
+                    <span className="font-semibold">{qtyInSak(o.assignedQty ?? o.orderedQty, o.uom?.unitsPerSak)} sak</span>
                     {o.isSplit && (
-                      <span className="text-muted-foreground ml-1">dari {o.orderedQty} {o.uom?.abbreviation ?? 'sak'} total</span>
+                      <span className="text-muted-foreground ml-1">dari {qtyInSak(o.orderedQty, o.uom?.unitsPerSak)} sak total</span>
                     )}
                     {(o.vehicleDeliveredQty ?? 0) > 0 && (
                       <span className="text-emerald-600 ml-2">· {o.vehicleDeliveredQty} terkirim</span>
@@ -611,9 +617,9 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
               <div className="text-sm text-muted-foreground space-y-0.5">
                 <p className="font-medium text-foreground">{delivTarget?.customer?.name}</p>
                 <p>
-                  {delivTarget?.assignedQty ?? delivTarget?.orderedQty} {delivTarget?.uom?.abbreviation ?? 'sak'} dialokasikan ke armada ini
+                  {qtyInSak(delivTarget?.assignedQty ?? delivTarget?.orderedQty ?? 0, delivTarget?.uom?.unitsPerSak)} sak dialokasikan ke armada ini
                   {delivTarget?.isSplit && (
-                    <span className="ml-1 text-amber-600">(dari {delivTarget?.orderedQty} {delivTarget?.uom?.abbreviation ?? 'sak'} total)</span>
+                    <span className="ml-1 text-amber-600">(dari {qtyInSak(delivTarget?.orderedQty ?? 0, delivTarget?.uom?.unitsPerSak)} sak total)</span>
                   )}
                 </p>
                 {(delivTarget?.vehicleDeliveredQty ?? 0) > 0 && (
@@ -691,12 +697,12 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
             <div className="space-y-3">
               <div className="flex justify-between text-sm text-muted-foreground">
                 <span>Total pesanan</span>
-                <span className="font-medium text-foreground">{qtyTarget?.orderedQty} {qtyTarget?.uom?.abbreviation ?? 'sak'}</span>
+                <span className="font-medium text-foreground">{qtyInSak(qtyTarget?.orderedQty ?? 0, qtyTarget?.uom?.unitsPerSak)} sak</span>
               </div>
               {(qtyTarget?.totalAllocated ?? 0) > 0 && (
                 <div className="flex justify-between text-sm text-muted-foreground">
                   <span>Sudah dialokasikan (armada lain)</span>
-                  <span>{qtyTarget?.totalAllocated} {qtyTarget?.uom?.abbreviation ?? 'sak'}</span>
+                  <span>{qtyTarget?.totalAllocated} sak</span>
                 </div>
               )}
               <div className="flex justify-between text-sm text-muted-foreground">
@@ -704,16 +710,16 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
                 <span>{stats?.sisaSlot ?? 0} sak</span>
               </div>
               <div className="space-y-1.5 pt-1">
-                <Label>Jumlah {qtyTarget?.uom?.abbreviation ?? 'sak'} untuk armada ini <span className="text-destructive">*</span></Label>
+                <Label>Jumlah sak untuk armada ini <span className="text-destructive">*</span></Label>
                 <Input
-                  type="number" min={0.001} step="any"
-                  max={Math.min(stats?.sisaSlot ?? 0, qtyTarget?.remainingQty ?? qtyTarget?.orderedQty ?? 0)}
+                  type="number" min={1}
+                  max={Math.min(stats?.sisaSlot ?? 0, qtyInSak(qtyTarget?.remainingQty ?? qtyTarget?.orderedQty ?? 0, qtyTarget?.uom?.unitsPerSak))}
                   value={qtyValue}
                   onChange={e => setQtyValue(e.target.value)}
                   autoFocus
                 />
                 <p className="text-xs text-muted-foreground">
-                  Maks: {Math.min(stats?.sisaSlot ?? 0, qtyTarget?.remainingQty ?? qtyTarget?.orderedQty ?? 0)} {qtyTarget?.uom?.abbreviation ?? 'sak'}
+                  Maks: {Math.min(stats?.sisaSlot ?? 0, qtyInSak(qtyTarget?.remainingQty ?? qtyTarget?.orderedQty ?? 0, qtyTarget?.uom?.unitsPerSak))} sak
                 </p>
               </div>
             </div>
@@ -777,7 +783,7 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
                           <p className="font-medium text-sm truncate">{o.customer?.name}</p>
                           {o.totalAllocated > 0 && (
                             <Badge variant="warning" className="text-xs h-4 px-1">
-                              {o.totalAllocated}/{o.orderedQty} {o.uom?.abbreviation ?? 'sak'} dialokasikan
+                              {o.totalAllocated}/{qtyInSak(o.orderedQty, o.uom?.unitsPerSak)} sak dialokasikan
                             </Badge>
                           )}
                         </div>
@@ -785,10 +791,10 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
                           {o.deliveryLocation?.namaLokasi ?? '—'}{o.rayon ? ` · ${o.rayon.name}` : ''}
                         </p>
                         <p className="text-xs mt-0.5">
-                          <span className="font-semibold">{remainingQty} {o.uom?.abbreviation ?? 'sak'}</span>
+                          <span className="font-semibold">{qtyInSak(remainingQty, o.uom?.unitsPerSak)} sak</span>
                           <span className="text-muted-foreground ml-1">tersisa</span>
                           {sisaSlot > 0 && maxQty < remainingQty && (
-                            <span className="text-muted-foreground ml-1">· maks {maxQty} {o.uom?.abbreviation ?? 'sak'} di armada ini</span>
+                            <span className="text-muted-foreground ml-1">· maks {qtyInSak(maxQty, o.uom?.unitsPerSak)} sak di armada ini</span>
                           )}
                         </p>
                       </div>
