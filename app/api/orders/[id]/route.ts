@@ -20,6 +20,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
                                       rayon: { select: { id: true, name: true } } } },
         vehicle:      { select: { id: true, plateNumber: true, capacitySak: true } },
         rayon:        { select: { id: true, name: true, coverageArea: true } },
+        uom:          { select: { id: true, abbreviation: true, unitsPerSak: true } },
         deliveryLogs: {
           include: {
             driver:  { select: { id: true, name: true, phone: true } },
