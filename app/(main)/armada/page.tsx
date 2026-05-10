@@ -5,6 +5,7 @@ import { format } from 'date-fns'
 import {
   Truck, User, Package, Clock, Plus, X, Settings2, CheckCircle2,
   Navigation2, LogIn, LogOut, ClipboardCheck, Wrench,
+  ListOrdered, ChevronDown, ChevronUp, AlertCircle,
 } from 'lucide-react'
 import useSWR from 'swr'
 import { fetcher } from '@/lib/fetcher'
@@ -26,6 +27,172 @@ import { useRole } from '@/hooks/useRole'
 import { useToast } from '@/hooks/use-toast'
 import { useRayons } from '@/hooks/useCustomers'
 import { formatCurrency } from '@/lib/utils'
+
+// ─── OrderQueuePanel: daftar pesanan hari ini sebagai acuan assign ───────────
+function OrderQueuePanel({ date, onRefreshFleet }: { date: string; onRefreshFleet: () => void }) {
+  const [open, setOpen] = useState(false)
+
+  const { data, isLoading, mutate } = useSWR(
+    open ? `/api/orders?date=${date}&limit=200&status=CONFIRMED,ASSIGNED,PARTIAL` : null,
+    fetcher,
+  )
+
+  const orders: any[] = (data?.orders ?? data ?? [])
+    .slice()
+    .sort((a: any, b: any) => {
+      // Urutkan: belum dialokasikan → sebagian → sudah penuh
+      const remA = a.remainingQty ?? a.orderedQty
+      const remB = b.remainingQty ?? b.orderedQty
+      const pctA = (a.orderedQty - remA) / (a.orderedQty || 1)
+      const pctB = (b.orderedQty - remB) / (b.orderedQty || 1)
+      return pctA - pctB      // asc: belum dialokasikan muncul duluan
+    })
+
+  // Hitung ringkasan untuk badge di header
+  const totalOrders     = orders.length
+  const belumAssign     = orders.filter((o: any) => (o.remainingQty ?? o.orderedQty) >= o.orderedQty).length
+  const sebagianAssign  = orders.filter((o: any) => {
+    const rem = o.remainingQty ?? o.orderedQty
+    return rem > 0 && rem < o.orderedQty
+  }).length
+
+  // Fetch tanpa SWR untuk refresh saat open berubah
+  useEffect(() => { if (open) mutate() }, [date])  // eslint-disable-line react-hooks/exhaustive-deps
+
+  return (
+    <div className="mb-4 rounded-lg border bg-card shadow-sm">
+      {/* Header toggle */}
+      <button
+        className="w-full flex items-center gap-3 px-4 py-3 text-left hover:bg-muted/40 transition-colors rounded-lg"
+        onClick={() => setOpen(v => !v)}
+      >
+        <ListOrdered className="h-4 w-4 text-muted-foreground shrink-0" />
+        <div className="flex-1 flex items-center gap-2 flex-wrap">
+          <span className="font-medium text-sm">Antrian Pesanan Hari Ini</span>
+          {!open && belumAssign > 0 && (
+            <span className="flex items-center gap-1 text-xs bg-amber-100 text-amber-700 px-2 py-0.5 rounded-full font-medium">
+              <AlertCircle className="h-3 w-3" />
+              {belumAssign} belum diassign
+            </span>
+          )}
+          {!open && sebagianAssign > 0 && (
+            <span className="text-xs bg-sky-100 text-sky-700 px-2 py-0.5 rounded-full font-medium">
+              {sebagianAssign} sebagian
+            </span>
+          )}
+        </div>
+        {open
+          ? <ChevronUp className="h-4 w-4 text-muted-foreground shrink-0" />
+          : <ChevronDown className="h-4 w-4 text-muted-foreground shrink-0" />
+        }
+      </button>
+
+      {/* Panel isi */}
+      {open && (
+        <div className="border-t">
+          {isLoading ? (
+            <div className="px-4 py-3"><LoadingState rows={3} /></div>
+          ) : orders.length === 0 ? (
+            <p className="text-sm text-muted-foreground text-center py-6">
+              Tidak ada pesanan terkonfirmasi untuk tanggal ini.
+            </p>
+          ) : (
+            <>
+              {/* Ringkasan singkat */}
+              <div className="flex gap-4 px-4 py-2.5 border-b bg-muted/30 text-xs text-muted-foreground flex-wrap">
+                <span>{totalOrders} pesanan total</span>
+                {belumAssign > 0 && (
+                  <span className="text-amber-700 font-medium flex items-center gap-1">
+                    <AlertCircle className="h-3 w-3" />{belumAssign} belum diassign
+                  </span>
+                )}
+                {sebagianAssign > 0 && (
+                  <span className="text-sky-700 font-medium">{sebagianAssign} sebagian teralokasi</span>
+                )}
+                {(totalOrders - belumAssign - sebagianAssign) > 0 && (
+                  <span className="text-emerald-700 font-medium">{totalOrders - belumAssign - sebagianAssign} sudah penuh</span>
+                )}
+              </div>
+
+              {/* Tabel pesanan */}
+              <div className="overflow-x-auto max-h-72 overflow-y-auto">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0 bg-muted/60 text-xs text-muted-foreground">
+                    <tr>
+                      <th className="text-left px-4 py-2 font-medium">Pelanggan</th>
+                      <th className="text-left px-4 py-2 font-medium hidden sm:table-cell">Rayon</th>
+                      <th className="text-right px-4 py-2 font-medium">Dipesan</th>
+                      <th className="text-right px-4 py-2 font-medium hidden sm:table-cell">Teralokasi</th>
+                      <th className="px-4 py-2 font-medium w-28">Alokasi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y">
+                    {orders.map((o: any) => {
+                      const totalAllocated = o.totalAllocated ?? 0
+                      const remaining      = o.remainingQty ?? (o.orderedQty - totalAllocated)
+                      const pct            = o.orderedQty > 0 ? Math.round((totalAllocated / o.orderedQty) * 100) : 0
+                      const isUnassigned   = totalAllocated === 0
+                      const isPartial      = totalAllocated > 0 && totalAllocated < o.orderedQty
+                      const isFull         = totalAllocated >= o.orderedQty
+
+                      return (
+                        <tr key={o.id} className="hover:bg-muted/20">
+                          <td className="px-4 py-2.5">
+                            <p className="font-medium leading-snug">{o.customer?.name}</p>
+                            <p className="text-xs text-muted-foreground font-mono">{o.orderNumber}</p>
+                          </td>
+                          <td className="px-4 py-2.5 hidden sm:table-cell">
+                            <span className="text-xs text-muted-foreground">{o.rayon?.name ?? o.deliveryLocation?.namaLokasi ?? '—'}</span>
+                          </td>
+                          <td className="px-4 py-2.5 text-right font-semibold tabular-nums">
+                            {o.orderedQty} sak
+                          </td>
+                          <td className="px-4 py-2.5 text-right hidden sm:table-cell tabular-nums">
+                            {isUnassigned ? (
+                              <span className="text-muted-foreground text-xs">—</span>
+                            ) : (
+                              <span className={isPartial ? 'text-amber-700' : 'text-emerald-700'}>
+                                {totalAllocated} / {o.orderedQty}
+                              </span>
+                            )}
+                          </td>
+                          <td className="px-4 py-2.5">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-1.5">
+                                <div className="flex-1 h-1.5 bg-muted rounded-full overflow-hidden">
+                                  <div
+                                    className={`h-full rounded-full transition-all ${
+                                      isFull    ? 'bg-emerald-500' :
+                                      isPartial ? 'bg-amber-500'   : 'bg-muted-foreground/30'
+                                    }`}
+                                    style={{ width: `${pct}%` }}
+                                  />
+                                </div>
+                                <span className={`text-xs font-medium tabular-nums w-8 text-right ${
+                                  isFull    ? 'text-emerald-700' :
+                                  isPartial ? 'text-amber-700'   : 'text-muted-foreground'
+                                }`}>
+                                  {pct}%
+                                </span>
+                              </div>
+                              {!isFull && remaining > 0 && (
+                                <p className="text-xs text-muted-foreground">sisa {remaining} sak</p>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
 
 // ─── ActivityLog: audit trail semua aksi operator di menu Pengiriman ────────
 const ACTION_CONFIG: Record<string, {
@@ -180,6 +347,42 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
   const [delivForm, setDelivForm]       = useState({ deliveredQty: '', returnedQty: '0', returnReason: '' })
   const [delivLoading, setDelivLoading] = useState(false)
 
+  // Jam berangkat — inline edit di header sheet
+  const toTimeValue = (iso: string | null | undefined) =>
+    iso ? format(new Date(iso), "HH:mm") : ''
+  const [timeValue, setTimeValue]   = useState(() => toTimeValue(armada?.departureTime))
+  const [savingTime, setSavingTime] = useState(false)
+
+  // Sync kalau armada prop berubah (misal setelah refresh)
+  useEffect(() => { setTimeValue(toTimeValue(armada?.departureTime)) }, [armada?.departureTime])
+
+  async function saveDepartureTime(val = timeValue) {
+    if (!armada?.id) return
+    setSavingTime(true)
+    try {
+      let body: Record<string, unknown>
+      if (val) {
+        const [hh, mm] = val.split(':').map(Number)
+        const dt       = new Date(date)
+        dt.setHours(hh, mm, 0, 0)
+        body = { departureTime: dt.toISOString() }
+      } else {
+        body = { departureTime: null }
+      }
+      const res = await fetch(`/api/fleet/${armada.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (!res.ok) {
+        const json = await res.json().catch(() => ({}))
+        toast({ title: 'Gagal menyimpan jam berangkat', description: json.message, variant: 'destructive' })
+        return
+      }
+      onRefresh()
+      toast({ title: val ? `Jam berangkat disimpan: ${val}` : 'Jam berangkat dihapus' })
+    } finally { setSavingTime(false) }
+  }
+
   const rayonId    = armada?.rayonId
   const rayonParam = (!showAllRayon && rayonId) ? `&rayonId=${rayonId}` : ''
 
@@ -287,6 +490,29 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
             <span className="flex items-center gap-1"><User className="h-3.5 w-3.5" />{armada?.driver?.name ?? '—'}</span>
             {armada?.helperName && <span>+ {armada.helperName}</span>}
             {armada?.rayon && <span className="flex items-center gap-1"><Package className="h-3.5 w-3.5" />{armada.rayon.name}</span>}
+          </div>
+          {/* Jam berangkat — inline */}
+          <div className="flex items-center gap-2 pt-1">
+            <Clock className="h-3.5 w-3.5 text-muted-foreground shrink-0" />
+            <span className="text-xs text-muted-foreground shrink-0">Jam berangkat</span>
+            <input
+              type="time"
+              value={timeValue}
+              onChange={e => setTimeValue(e.target.value)}
+              onBlur={() => saveDepartureTime()}
+              disabled={savingTime}
+              className="h-7 rounded-md border border-input bg-background px-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50 w-28"
+            />
+            {timeValue && (
+              <button
+                type="button"
+                className="text-xs text-muted-foreground hover:text-destructive"
+                onClick={() => { setTimeValue(''); saveDepartureTime('') }}
+              >
+                <X className="h-3 w-3" />
+              </button>
+            )}
+            {savingTime && <span className="text-xs text-muted-foreground">Menyimpan...</span>}
           </div>
         </SheetHeader>
 
@@ -766,6 +992,7 @@ export default function PengirimanPage() {
         {/* ══ TAB: KELOLA SLOT ══════════════════════════════════════════════════ */}
         <TabsContent value="slot">
           {DatePicker}
+          <OrderQueuePanel date={date} onRefreshFleet={handleRefresh} />
           {fleetLoading ? (
             <LoadingCards count={3} />
           ) : fleet.length === 0 ? (

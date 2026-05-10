@@ -213,13 +213,38 @@ export async function POST(req: NextRequest) {
 
         console.log('Order created:', order.id)
 
+        // Tulis ActivityLog — source adalah Fonnte webhook, bukan operator manual
+        prisma.activityLog.create({
+          data: {
+            action:    'ORDER_CREATED',
+            userName:  'Fonnte (WA)',
+            userEmail: sender ? String(sender) : null,
+            orderId:   order.id,
+            date:      new Date(parsed.deliveryDate),
+            meta: {
+              orderNumber,
+              customerName: customer.name,
+              orderedQty:   parsed.orderedQty,
+              pricePerUnit: priceProfile.price,
+              orderChannel: 'HOTLINE',
+              source:       'fonnte_webhook',
+              sender:       sender ?? null,
+            } as any,
+          },
+        }).catch(() => null)
+
         try {
+          // Format tanggal DD/MM/YYYY untuk pesan WA
+          const [yyyy, mm, dd] = parsed.deliveryDate.split('-')
+          const tglFmt = `${dd}/${mm}/${yyyy}`
+          const totalHarga = (parsed.orderedQty * priceProfile.price).toLocaleString('id-ID')
+
           await fetch(`${process.env.NEXTAUTH_URL || 'http://localhost:3000'}/api/webhook/fonnte/send`, {
             method:  'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               target:  sender,
-              message: `✅ Pesanan Anda telah diterima!\n\n📦 ${parsed.orderedQty} sak es kristal\n📅 Pengiriman: ${parsed.deliveryDate}\n💰 Harga: Rp ${priceProfile.price.toLocaleString('id-ID')}/sak\n🏪 ${customer.name}\n\nTerima kasih telah memesan!`,
+              message: `✅ Pesanan diterima!\n\n🏪 ${customer.name}\n📦 ${parsed.orderedQty} sak es kristal\n📅 Tanggal kirim: ${tglFmt}\n💰 ${priceProfile.price.toLocaleString('id-ID')}/sak × ${parsed.orderedQty} = Rp ${totalHarga}\n🔖 No. Pesanan: ${orderNumber}\n\nTerima kasih sudah memesan! 🙏`,
             }),
           })
         } catch (sendErr) {
@@ -231,15 +256,20 @@ export async function POST(req: NextRequest) {
     }
 
     // ── Simpan sebagai draft ──────────────────────────────────────────────────
+    // Jika customer sudah dikenali, pre-fill deliveryLocationId dengan lokasi default-nya
+    // sehingga operator tidak perlu pilih lokasi lagi saat review draft
+    const draftLocationId = customer?.locations?.[0]?.id ?? null
+
     const draft = await prisma.waDraft.create({
       data: {
-        rawMessage:       message,
-        sender:           sender ?? null,
-        customerNameHint: parsed.customerName,
-        customerId:       customer?.id ?? null,
-        orderedQty:       parsed.orderedQty,
-        deliveryDate:     parsed.deliveryDate,
-        notes:            parsed.notes,
+        rawMessage:         message,
+        sender:             sender ?? null,
+        customerNameHint:   parsed.customerName,
+        customerId:         customer?.id ?? null,
+        deliveryLocationId: draftLocationId,
+        orderedQty:         parsed.orderedQty,
+        deliveryDate:       parsed.deliveryDate,
+        notes:              parsed.notes,
       },
     })
 
