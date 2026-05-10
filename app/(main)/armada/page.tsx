@@ -152,7 +152,7 @@ function OrderQueuePanel({ date, onRefreshFleet }: { date: string; onRefreshFlee
                               <span className="text-muted-foreground text-xs">—</span>
                             ) : (
                               <span className={isPartial ? 'text-amber-700' : 'text-emerald-700'}>
-                                {totalAllocated} / {o.orderedQty}
+                                {totalAllocated} / {o.orderedQty} {o.uom?.abbreviation ?? 'sak'}
                               </span>
                             )}
                           </td>
@@ -176,7 +176,7 @@ function OrderQueuePanel({ date, onRefreshFleet }: { date: string; onRefreshFlee
                                 </span>
                               </div>
                               {!isFull && remaining > 0 && (
-                                <p className="text-xs text-muted-foreground">sisa {remaining} sak</p>
+                                <p className="text-xs text-muted-foreground">sisa {remaining} {o.uom?.abbreviation ?? 'sak'}</p>
                               )}
                             </div>
                           </td>
