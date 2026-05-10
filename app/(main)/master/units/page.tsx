@@ -3,6 +3,7 @@
 import useSWR, { mutate } from 'swr'
 import { useState } from 'react'
 import { Plus, Pencil, Trash2, Star } from 'lucide-react'
+import { PageHeader } from '@/components/shared/PageHeader'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -97,16 +98,12 @@ export default function MasterUnitsPage() {
   }
 
   return (
-    <div className="p-6 max-w-2xl mx-auto space-y-6">
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold">Satuan (UOM)</h1>
-          <p className="text-muted-foreground text-sm mt-1">
-            Kelola satuan pesanan selain sak dan faktor konversinya
-          </p>
-        </div>
-        <Button onClick={openNew}><Plus className="w-4 h-4 mr-1" /> Tambah Unit</Button>
-      </div>
+    <div className="space-y-6">
+      <PageHeader
+        title="Satuan (UOM)"
+        description="Kelola satuan pesanan selain sak dan faktor konversinya"
+        action={<Button onClick={openNew}><Plus className="w-4 h-4 mr-1" /> Tambah Unit</Button>}
+      />
 
       {/* Info konversi */}
       <div className="rounded-lg border bg-muted/40 p-4 text-sm text-muted-foreground">
