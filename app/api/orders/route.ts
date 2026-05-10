@@ -76,7 +76,7 @@ export async function GET(req: NextRequest) {
 
 // ─── POST /api/orders ─────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
-  const { error } = await requireAuth()
+  const { user, error } = await requireAuth()
   if (error) return error
 
   try {
@@ -133,6 +133,25 @@ export async function POST(req: NextRequest) {
         rayon:            { select: { id: true, name: true } },
       },
     })
+
+    // Tulis activity log (non-blocking)
+    prisma.activityLog.create({
+      data: {
+        action:    'ORDER_CREATED',
+        userId:    user!.id,
+        userName:  user!.name,
+        userEmail: user!.email,
+        orderId:   order.id,
+        date:      new Date(deliveryDate),
+        meta: {
+          orderNumber:  order.orderNumber,
+          customerName: order.customer?.name,
+          orderedQty,
+          pricePerUnit,
+          orderChannel,
+        } as any,
+      },
+    }).catch(() => null)
 
     return apiCreated(order, 'Order berhasil dibuat')
   } catch (err) {

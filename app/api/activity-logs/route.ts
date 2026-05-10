@@ -24,7 +24,10 @@ export async function GET(req: NextRequest) {
       date: { gte: date, lt: nextDay },
     }
     if (vehicleId) where.vehicleId = vehicleId
-    if (action)    where.action    = action
+    if (action) {
+      const actions = action.split(',').map((s: string) => s.trim()).filter(Boolean)
+      where.action = actions.length === 1 ? actions[0] : { in: actions }
+    }
 
     const [logs, total] = await Promise.all([
       prisma.activityLog.findMany({

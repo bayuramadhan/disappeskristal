@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { format } from 'date-fns'
-import { Plus, Search, X, Download, Inbox, Trash2 } from 'lucide-react'
+import {
+  Plus, Search, X, Download, Inbox, Trash2, History,
+  FilePlus2, ArrowRightLeft, Truck, LogIn, LogOut, ClipboardCheck, Clock,
+} from 'lucide-react'
 import Papa from 'papaparse'
 import { useOrders } from '@/hooks/useOrders'
 import { useCustomers } from '@/hooks/useCustomers'
@@ -21,10 +24,32 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Card, CardContent } from '@/components/ui/card'
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog'
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Textarea } from '@/components/ui/textarea'
 import { formatCurrency } from '@/lib/utils'
 import useSWR, { mutate as globalMutate } from 'swr'
 import { fetcher } from '@/lib/fetcher'
+
+// ─── Konfigurasi tampilan per tipe aksi ─────────────────────────────────────
+const ORDER_ACTIVITY_ACTIONS = 'ORDER_CREATED,ORDER_STATUS_CHANGED,ORDER_DELETED,ORDER_ASSIGNED,ORDER_UNASSIGNED,DELIVERY_LOGGED'
+
+const STATUS_CHANGE_COLOR: Record<string, string> = {
+  CONFIRMED: 'text-emerald-700', ASSIGNED: 'text-sky-700',
+  CANCELLED:  'text-destructive', REJECTED: 'text-destructive',
+  DELIVERED:  'text-emerald-700', PARTIAL:  'text-amber-700',
+  RETURNED:   'text-amber-700',
+}
+
+const ACTIVITY_CONFIG: Record<string, {
+  label: string; color: string; bg: string; border: string; icon: React.ReactNode
+}> = {
+  ORDER_CREATED:        { label: 'Pesanan Dibuat',     color: 'text-emerald-700', bg: 'bg-emerald-50', border: 'border-emerald-200', icon: <FilePlus2 className="h-4 w-4 text-emerald-600" /> },
+  ORDER_STATUS_CHANGED: { label: 'Status Diubah',      color: 'text-sky-700',     bg: 'bg-sky-50',     border: 'border-sky-200',     icon: <ArrowRightLeft className="h-4 w-4 text-sky-600" /> },
+  ORDER_DELETED:        { label: 'Pesanan Dihapus',    color: 'text-destructive', bg: 'bg-red-50',     border: 'border-red-200',     icon: <Trash2 className="h-4 w-4 text-destructive" /> },
+  ORDER_ASSIGNED:       { label: 'Masuk Armada',       color: 'text-sky-700',     bg: 'bg-sky-50',     border: 'border-sky-200',     icon: <LogIn className="h-4 w-4 text-sky-600" /> },
+  ORDER_UNASSIGNED:     { label: 'Keluar Armada',      color: 'text-amber-700',   bg: 'bg-amber-50',   border: 'border-amber-200',   icon: <LogOut className="h-4 w-4 text-amber-600" /> },
+  DELIVERY_LOGGED:      { label: 'Pengiriman Dicatat', color: 'text-violet-700',  bg: 'bg-violet-50',  border: 'border-violet-200',  icon: <ClipboardCheck className="h-4 w-4 text-violet-600" /> },
+}
 
 const STATUS_OPTIONS  = ['CREATED', 'CONFIRMED', 'LOADED', 'DELIVERED', 'PARTIAL', 'RETURNED', 'CANCELLED']
 const CHANNEL_OPTIONS = ['PREORDER', 'HOTLINE', 'CANVAS']
@@ -44,6 +69,147 @@ const STATUS_LABELS: Record<string, string> = {
   RETURNED:  'Dikembalikan',
   CANCELLED: 'Dibatalkan',
   REJECTED:  'Ditolak',
+}
+
+// ─── OrderActivityLog: audit trail untuk menu Pesanan ────────────────────────
+function OrderActivityLog({ date, onDateChange }: { date: string; onDateChange: (d: string) => void }) {
+  const { data, isLoading, mutate } = useSWR(
+    `/api/activity-logs?date=${date}&limit=200&action=${ORDER_ACTIVITY_ACTIONS}`,
+    fetcher,
+    { refreshInterval: 20_000 },
+  )
+  const logs: any[] = data?.data ?? data ?? []
+
+  return (
+    <div>
+      {/* Date picker */}
+      <div className="flex items-center gap-3 mb-4">
+        <Label className="text-sm shrink-0">Tanggal</Label>
+        <Input
+          type="date" value={date}
+          onChange={e => onDateChange(e.target.value)}
+          className="w-40 h-8 text-sm"
+        />
+        <Button variant="ghost" size="sm" className="h-8 text-xs"
+          onClick={() => onDateChange(format(new Date(), 'yyyy-MM-dd'))}>
+          Hari Ini
+        </Button>
+        <div className="flex-1" />
+        <p className="text-sm text-muted-foreground">
+          {isLoading ? 'Memuat...' : `${logs.length} aktivitas`}
+        </p>
+        <Button variant="ghost" size="sm" className="h-8 text-xs gap-1.5" onClick={() => mutate()}>
+          <Clock className="h-3.5 w-3.5" /> Refresh
+        </Button>
+      </div>
+
+      {isLoading ? (
+        <LoadingState rows={6} />
+      ) : logs.length === 0 ? (
+        <EmptyState
+          title="Belum ada aktivitas"
+          description="Setiap perubahan pesanan — dibuat, dikonfirmasi, dibatalkan, diassign, atau dicatat pengirimannya — akan tercatat di sini."
+        />
+      ) : (
+        <div className="space-y-2">
+          {logs.map((log: any) => {
+            const meta = log.meta ?? {}
+            const cfg  = ACTIVITY_CONFIG[log.action] ?? ACTIVITY_CONFIG.ORDER_STATUS_CHANGED
+
+            // Untuk ORDER_STATUS_CHANGED, warna teks status tujuan
+            const toStatusColor = log.action === 'ORDER_STATUS_CHANGED'
+              ? (STATUS_CHANGE_COLOR[meta.toStatus] ?? 'text-foreground')
+              : null
+
+            return (
+              <div key={log.id} className={`flex gap-3 rounded-lg border p-3 ${cfg.bg} ${cfg.border}`}>
+                {/* Ikon aksi */}
+                <div className="mt-0.5 shrink-0">{cfg.icon}</div>
+
+                {/* Body */}
+                <div className="flex-1 min-w-0 space-y-0.5">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <span className={`text-sm font-semibold ${cfg.color}`}>{cfg.label}</span>
+                    {log.vehicle && (
+                      <span className="flex items-center gap-1 text-xs text-muted-foreground font-mono">
+                        <Truck className="h-3 w-3" />{log.vehicle.plateNumber}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Pelanggan & no. pesanan */}
+                  {meta.customerName && (
+                    <p className="text-sm font-medium">{meta.customerName}</p>
+                  )}
+
+                  {/* Detail spesifik per action */}
+                  {log.action === 'ORDER_CREATED' && (
+                    <p className="text-sm text-muted-foreground">
+                      {meta.orderedQty} sak · {meta.orderChannel}
+                      {meta.pricePerUnit && ` · ${formatCurrency(meta.pricePerUnit)}/sak`}
+                    </p>
+                  )}
+                  {log.action === 'ORDER_STATUS_CHANGED' && (
+                    <p className="text-sm text-muted-foreground">
+                      <StatusBadge status={meta.fromStatus} />
+                      <span className="mx-1.5">→</span>
+                      <span className={`font-semibold ${toStatusColor}`}>
+                        <StatusBadge status={meta.toStatus} />
+                      </span>
+                      {meta.deliveredQty != null && meta.deliveredQty > 0 && (
+                        <span className="ml-2">· {meta.deliveredQty} sak terkirim</span>
+                      )}
+                    </p>
+                  )}
+                  {log.action === 'ORDER_DELETED' && (
+                    <p className="text-sm text-muted-foreground">
+                      {meta.orderedQty} sak · status sebelumnya: <StatusBadge status={meta.fromStatus} />
+                    </p>
+                  )}
+                  {log.action === 'ORDER_ASSIGNED' && (
+                    <p className="text-sm text-muted-foreground">
+                      {meta.qty} sak → {meta.plateNumber}
+                    </p>
+                  )}
+                  {log.action === 'ORDER_UNASSIGNED' && (
+                    <p className="text-sm text-muted-foreground">
+                      {meta.plateNumber
+                        ? `dikeluarkan dari ${meta.plateNumber}`
+                        : 'dikeluarkan dari semua armada'}
+                    </p>
+                  )}
+                  {log.action === 'DELIVERY_LOGGED' && (
+                    <p className="text-sm text-muted-foreground">
+                      {meta.deliveredQty} sak terkirim
+                      {meta.returnedQty > 0 && ` · ${meta.returnedQty} retur`}
+                      {meta.plateNumber && ` · ${meta.plateNumber}`}
+                      {' · Status → '}
+                      <StatusBadge status={meta.orderStatus} />
+                    </p>
+                  )}
+
+                  {/* No. pesanan */}
+                  {meta.orderNumber && (
+                    <p className="text-xs text-muted-foreground font-mono mt-0.5">{meta.orderNumber}</p>
+                  )}
+                </div>
+
+                {/* Timestamp & operator */}
+                <div className="shrink-0 text-right space-y-0.5">
+                  <p className="text-xs font-mono text-muted-foreground">
+                    {format(new Date(log.timestamp), 'HH:mm:ss')}
+                  </p>
+                  {log.userName && (
+                    <p className="text-xs text-muted-foreground">{log.userName}</p>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
 }
 
 function DraftCard({ draft, customers, today, onPublish, onDelete, isReviewing, onReview }: {
@@ -497,6 +663,19 @@ const { canWrite, isAdmin } = useRole()
         }
       />
 
+      <Tabs defaultValue="orders">
+        <TabsList className="mb-4">
+          <TabsTrigger value="orders" className="gap-2">
+            <Truck className="h-4 w-4" /> Pesanan
+          </TabsTrigger>
+          <TabsTrigger value="log" className="gap-2">
+            <History className="h-4 w-4" /> Log Aktivitas
+          </TabsTrigger>
+        </TabsList>
+
+        {/* ══ TAB: PESANAN ═══════════════════════════════════════════════════ */}
+        <TabsContent value="orders">
+
       {/* Filters */}
       <Card className="mb-4">
         <CardContent className="pt-4 pb-4">
@@ -635,6 +814,15 @@ const { canWrite, isAdmin } = useRole()
           )}
         </DialogContent>
       </Dialog>
+
+        </TabsContent>{/* end "orders" tab */}
+
+        {/* ══ TAB: LOG AKTIVITAS ════════════════════════════════════════════ */}
+        <TabsContent value="log">
+          <OrderActivityLog date={filters.date} onDateChange={d => setFilter('date', d)} />
+        </TabsContent>
+
+      </Tabs>{/* end Tabs */}
 
       {/* Detail Sheet */}
       <Sheet open={!!selectedOrder} onOpenChange={open => !open && setSelectedOrder(null)}>

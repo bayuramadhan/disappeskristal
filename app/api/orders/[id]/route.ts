@@ -39,7 +39,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
 
 // ─── PATCH /api/orders/[id] ───────────────────────────────────────────────────
 export async function PATCH(req: NextRequest, { params }: Params) {
-  const { error } = await requireAuth()
+  const { user, error } = await requireAuth()
   if (error) return error
 
   try {
@@ -76,6 +76,27 @@ export async function PATCH(req: NextRequest, { params }: Params) {
       },
     })
 
+    // Tulis activity log (non-blocking)
+    prisma.activityLog.create({
+      data: {
+        action:    'ORDER_STATUS_CHANGED',
+        userId:    user!.id,
+        userName:  user!.name,
+        userEmail: user!.email,
+        orderId:   params.id,
+        date:      existing.deliveryDate,
+        meta: {
+          orderNumber:  existing.orderNumber,
+          customerName: updated.customer?.name ?? null,
+          fromStatus:   existing.status,
+          toStatus:     status,
+          deliveredQty: deliveredQty ?? null,
+          returnedQty:  returnedQty  ?? null,
+          returnReason: returnReason ?? null,
+        } as any,
+      },
+    }).catch(() => null)
+
     return apiSuccess(updated, 'Status order berhasil diperbarui')
   } catch (err) {
     return apiServerError(err)
@@ -102,6 +123,23 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
       where: { id: params.id },
       data: { deletedAt: new Date(), status: 'CANCELLED' as any },
     })
+
+    // Tulis activity log (non-blocking)
+    prisma.activityLog.create({
+      data: {
+        action:    'ORDER_DELETED',
+        userId:    user.id,
+        userName:  user.name,
+        userEmail: user.email,
+        orderId:   params.id,
+        date:      existing.deliveryDate,
+        meta: {
+          orderNumber:  existing.orderNumber,
+          orderedQty:   existing.orderedQty,
+          fromStatus:   existing.status,
+        } as any,
+      },
+    }).catch(() => null)
 
     return apiSuccess(null, 'Order berhasil dihapus')
   } catch (err) {

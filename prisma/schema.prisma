@@ -530,10 +530,15 @@ model VehicleMaintenance {
 // ==================== ACTIVITY LOG ====================
 
 enum ActivityAction {
-  ORDER_ASSIGNED    // pesanan dimasukkan ke armada
-  ORDER_UNASSIGNED  // pesanan dikeluarkan dari armada
-  DELIVERY_LOGGED   // pengiriman dicatat
-  FLEET_UPDATED     // data armada harian diubah (driver/rayon/helper/jam berangkat)
+  // ── Pesanan (menu Pesanan) ────────────────────────────────────────────────
+  ORDER_CREATED         // pesanan baru dibuat
+  ORDER_STATUS_CHANGED  // status pesanan diubah (konfirmasi / batalkan / tolak)
+  ORDER_DELETED         // pesanan dihapus (soft delete)
+  // ── Pengiriman (menu Pengiriman) ──────────────────────────────────────────
+  ORDER_ASSIGNED        // pesanan dimasukkan ke armada
+  ORDER_UNASSIGNED      // pesanan dikeluarkan dari armada
+  DELIVERY_LOGGED       // pengiriman dicatat
+  FLEET_UPDATED         // data armada harian diubah (driver/rayon/helper/jam berangkat)
 }
 
 model ActivityLog {
