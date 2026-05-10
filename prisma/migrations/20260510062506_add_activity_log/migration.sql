@@ -1,12 +1,9 @@
 -- CreateEnum
 CREATE TYPE "ActivityAction" AS ENUM ('ORDER_ASSIGNED', 'ORDER_UNASSIGNED', 'DELIVERY_LOGGED', 'FLEET_UPDATED');
 
--- AlterTable
+-- AlterTable: CustomerLocation default fix (CustomerPIC not yet created at this point — moved to add_customer_pic)
 ALTER TABLE "CustomerLocation" ALTER COLUMN "isDefault" SET DEFAULT false,
 ALTER COLUMN "updatedAt" DROP DEFAULT;
-
--- AlterTable
-ALTER TABLE "CustomerPIC" ALTER COLUMN "updatedAt" DROP DEFAULT;
 
 -- CreateTable
 CREATE TABLE "ActivityLog" (

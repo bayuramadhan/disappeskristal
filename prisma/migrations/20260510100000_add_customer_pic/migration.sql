@@ -22,3 +22,6 @@ CREATE INDEX "CustomerPIC_customerId_isActive_idx" ON "CustomerPIC"("customerId"
 ALTER TABLE "CustomerPIC"
     ADD CONSTRAINT "CustomerPIC_customerId_fkey"
     FOREIGN KEY ("customerId") REFERENCES "Customer"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- Drop default on updatedAt so Prisma manages it (moved from add_activity_log which ran before this table existed)
+ALTER TABLE "CustomerPIC" ALTER COLUMN "updatedAt" DROP DEFAULT;
