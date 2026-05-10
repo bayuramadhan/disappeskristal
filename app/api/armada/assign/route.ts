@@ -189,6 +189,7 @@ export async function POST(req: NextRequest) {
       customerName: order.customer.name,
       plateNumber:  vehicle.plateNumber,
       qty,
+      qtySak: Math.ceil(newQtySak),
       uom: uomLabel,
     })
     return apiSuccess(updated, `${qty} ${uomLabel} dialokasikan ke armada`)

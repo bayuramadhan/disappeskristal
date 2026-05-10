@@ -271,7 +271,9 @@ function ActivityLogTab({ date, DatePicker }: { date: string; DatePicker: React.
                   {log.action === 'ORDER_ASSIGNED' && (
                     <p className="text-sm">
                       <span className="font-medium">{meta.customerName}</span>
-                      <span className="text-muted-foreground"> — {meta.qty} sak → {meta.plateNumber}</span>
+                      <span className="text-muted-foreground">
+                        {' '}— {meta.qtySak ?? meta.qty} sak → {meta.plateNumber}
+                      </span>
                     </p>
                   )}
                   {log.action === 'ORDER_UNASSIGNED' && (
