@@ -505,20 +505,28 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
               type="time"
               value={timeValue}
               onChange={e => setTimeValue(e.target.value)}
-              onBlur={() => saveDepartureTime()}
+              onKeyDown={e => e.key === 'Enter' && saveDepartureTime()}
               disabled={savingTime}
               className="h-7 rounded-md border border-input bg-background px-2 text-xs font-mono focus:outline-none focus:ring-1 focus:ring-ring disabled:opacity-50 w-28"
             />
+            <button
+              type="button"
+              disabled={savingTime}
+              onClick={() => saveDepartureTime()}
+              className="h-7 px-2 rounded-md bg-primary text-primary-foreground text-xs font-medium hover:bg-primary/90 disabled:opacity-50 transition-colors"
+            >
+              {savingTime ? '...' : 'Simpan'}
+            </button>
             {timeValue && (
               <button
                 type="button"
                 className="text-xs text-muted-foreground hover:text-destructive"
                 onClick={() => { setTimeValue(''); saveDepartureTime('') }}
+                title="Hapus jam berangkat"
               >
                 <X className="h-3 w-3" />
               </button>
             )}
-            {savingTime && <span className="text-xs text-muted-foreground">Menyimpan...</span>}
           </div>
         </SheetHeader>
 
