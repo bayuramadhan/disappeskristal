@@ -138,6 +138,7 @@ export async function POST(req: NextRequest) {
 
     const parsed = parseWAMessage(message)
     console.log('Parsed:', parsed)
+    console.log('UOM hint:', parsed.uomHint, '| orderedQty:', parsed.orderedQty)
 
     // ── Customer lookup: cari via PIC phone dulu, lalu nama customer ────────────
     const customerInclude = {
@@ -192,6 +193,7 @@ export async function POST(req: NextRequest) {
     const uomId        = resolvedUnit?.id ?? null
     const uomLabel     = resolvedUnit?.abbreviation ?? 'sak'
     const unitsPerSak  = resolvedUnit?.unitsPerSak ?? 1
+    console.log('Resolved unit:', resolvedUnit, '| uomLabel:', uomLabel, '| unitsPerSak:', unitsPerSak)
 
     // ── Auto-create order jika semua data lengkap ─────────────────────────────
     if (customer && parsed.orderedQty) {
