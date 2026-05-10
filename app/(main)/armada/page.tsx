@@ -558,9 +558,9 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
                     {o.deliveryLocation?.namaLokasi ?? '—'}{o.rayon ? ` · ${o.rayon.name}` : ''}
                   </p>
                   <p className="text-xs mt-1">
-                    <span className="font-semibold">{o.assignedQty ?? o.orderedQty} sak</span>
+                    <span className="font-semibold">{o.assignedQty ?? o.orderedQty} {o.uom?.abbreviation ?? 'sak'}</span>
                     {o.isSplit && (
-                      <span className="text-muted-foreground ml-1">dari {o.orderedQty} sak total</span>
+                      <span className="text-muted-foreground ml-1">dari {o.orderedQty} {o.uom?.abbreviation ?? 'sak'} total</span>
                     )}
                     {(o.vehicleDeliveredQty ?? 0) > 0 && (
                       <span className="text-emerald-600 ml-2">· {o.vehicleDeliveredQty} terkirim</span>
@@ -611,9 +611,9 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
               <div className="text-sm text-muted-foreground space-y-0.5">
                 <p className="font-medium text-foreground">{delivTarget?.customer?.name}</p>
                 <p>
-                  {delivTarget?.assignedQty ?? delivTarget?.orderedQty} sak dialokasikan ke armada ini
+                  {delivTarget?.assignedQty ?? delivTarget?.orderedQty} {delivTarget?.uom?.abbreviation ?? 'sak'} dialokasikan ke armada ini
                   {delivTarget?.isSplit && (
-                    <span className="ml-1 text-amber-600">(dari {delivTarget?.orderedQty} sak total)</span>
+                    <span className="ml-1 text-amber-600">(dari {delivTarget?.orderedQty} {delivTarget?.uom?.abbreviation ?? 'sak'} total)</span>
                   )}
                 </p>
                 {(delivTarget?.vehicleDeliveredQty ?? 0) > 0 && (
@@ -685,18 +685,18 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
         <Dialog open={!!qtyTarget} onOpenChange={o => { if (!o) setQtyTarget(null) }}>
           <DialogContent className="max-w-sm">
             <DialogHeader>
-              <DialogTitle>Berapa sak untuk armada ini?</DialogTitle>
+              <DialogTitle>Alokasikan ke armada ini?</DialogTitle>
               <p className="text-sm text-muted-foreground">{qtyTarget?.customer?.name}</p>
             </DialogHeader>
             <div className="space-y-3">
               <div className="flex justify-between text-sm text-muted-foreground">
                 <span>Total pesanan</span>
-                <span className="font-medium text-foreground">{qtyTarget?.orderedQty} sak</span>
+                <span className="font-medium text-foreground">{qtyTarget?.orderedQty} {qtyTarget?.uom?.abbreviation ?? 'sak'}</span>
               </div>
               {(qtyTarget?.totalAllocated ?? 0) > 0 && (
                 <div className="flex justify-between text-sm text-muted-foreground">
                   <span>Sudah dialokasikan (armada lain)</span>
-                  <span>{qtyTarget?.totalAllocated} sak</span>
+                  <span>{qtyTarget?.totalAllocated} {qtyTarget?.uom?.abbreviation ?? 'sak'}</span>
                 </div>
               )}
               <div className="flex justify-between text-sm text-muted-foreground">
@@ -704,16 +704,16 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
                 <span>{stats?.sisaSlot ?? 0} sak</span>
               </div>
               <div className="space-y-1.5 pt-1">
-                <Label>Jumlah sak untuk armada ini <span className="text-destructive">*</span></Label>
+                <Label>Jumlah {qtyTarget?.uom?.abbreviation ?? 'sak'} untuk armada ini <span className="text-destructive">*</span></Label>
                 <Input
-                  type="number" min={1}
+                  type="number" min={0.001} step="any"
                   max={Math.min(stats?.sisaSlot ?? 0, qtyTarget?.remainingQty ?? qtyTarget?.orderedQty ?? 0)}
                   value={qtyValue}
                   onChange={e => setQtyValue(e.target.value)}
                   autoFocus
                 />
                 <p className="text-xs text-muted-foreground">
-                  Maks: {Math.min(stats?.sisaSlot ?? 0, qtyTarget?.remainingQty ?? qtyTarget?.orderedQty ?? 0)} sak
+                  Maks: {Math.min(stats?.sisaSlot ?? 0, qtyTarget?.remainingQty ?? qtyTarget?.orderedQty ?? 0)} {qtyTarget?.uom?.abbreviation ?? 'sak'}
                 </p>
               </div>
             </div>
@@ -777,7 +777,7 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
                           <p className="font-medium text-sm truncate">{o.customer?.name}</p>
                           {o.totalAllocated > 0 && (
                             <Badge variant="warning" className="text-xs h-4 px-1">
-                              {o.totalAllocated}/{o.orderedQty} sak dialokasikan
+                              {o.totalAllocated}/{o.orderedQty} {o.uom?.abbreviation ?? 'sak'} dialokasikan
                             </Badge>
                           )}
                         </div>
@@ -785,10 +785,10 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
                           {o.deliveryLocation?.namaLokasi ?? '—'}{o.rayon ? ` · ${o.rayon.name}` : ''}
                         </p>
                         <p className="text-xs mt-0.5">
-                          <span className="font-semibold">{remainingQty} sak</span>
+                          <span className="font-semibold">{remainingQty} {o.uom?.abbreviation ?? 'sak'}</span>
                           <span className="text-muted-foreground ml-1">tersisa</span>
                           {sisaSlot > 0 && maxQty < remainingQty && (
-                            <span className="text-muted-foreground ml-1">· maks {maxQty} sak di armada ini</span>
+                            <span className="text-muted-foreground ml-1">· maks {maxQty} {o.uom?.abbreviation ?? 'sak'} di armada ini</span>
                           )}
                         </p>
                       </div>
