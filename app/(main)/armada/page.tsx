@@ -443,6 +443,7 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
       const json = await res.json()
       if (!res.ok) { toast({ title: 'Gagal menambahkan', description: json.message, variant: 'destructive' }); return }
       setQtyTarget(null)
+      setAddOpen(false)   // tutup dialog "Pilih Pesanan" setelah berhasil assign
       onRefresh()
       toast({ title: `${qtySak} sak dimasukkan ke armada`, description: json.data?.customer?.name })
     } finally { setAssigning(null) }
@@ -738,7 +739,14 @@ function SlotSheet({ armada, date, open, onClose, onRefresh }: {
                   type="number" min={1}
                   max={Math.min(stats?.sisaSlot ?? 0, qtyInSak(qtyTarget?.remainingQty ?? qtyTarget?.orderedQty ?? 0, qtyTarget?.uom?.unitsPerSak))}
                   value={qtyValue}
-                  onChange={e => setQtyValue(e.target.value)}
+                  onChange={e => {
+                    const maxSak = Math.min(
+                      stats?.sisaSlot ?? 0,
+                      qtyInSak(qtyTarget?.remainingQty ?? qtyTarget?.orderedQty ?? 0, qtyTarget?.uom?.unitsPerSak)
+                    )
+                    const v = e.target.value
+                    setQtyValue(Number(v) > maxSak ? String(maxSak) : v)
+                  }}
                   autoFocus
                 />
                 <p className="text-xs text-muted-foreground">

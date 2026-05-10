@@ -2,6 +2,7 @@ import { NextRequest } from 'next/server'
 import { prisma } from '@/lib/db'
 import { requireAuth } from '@/lib/api/auth'
 import { apiSuccess, apiServerError, parseDate, todayDate } from '@/lib/api/response'
+import { toSak } from '@/lib/uom'
 
 // ─── GET /api/armada/daily?date= ─────────────────────────────────────────────
 // Mengembalikan semua Armada aktif beserta FleetDailyStatus untuk tanggal tsb.
@@ -135,7 +136,9 @@ export async function GET(req: NextRequest) {
           }
         })
 
-        const totalAssigned  = assignments.reduce((s, a) => s + a.qty, 0)
+        // a.qty disimpan dalam unit asli pesanan (mis. kg); konversi ke sak agar
+        // bisa dibandingkan dengan capacitySak (yang selalu dalam sak)
+        const totalAssigned  = assignments.reduce((s, a) => s + toSak(a.qty, a.order.uom?.unitsPerSak), 0)
         const totalDelivered = orders.reduce((s, o) => s + (o.deliveredQty ?? 0), 0)
         const capacitySak    = f.vehicle?.capacitySak ?? 0
 
