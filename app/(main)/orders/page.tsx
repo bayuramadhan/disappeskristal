@@ -212,8 +212,8 @@ function OrderActivityLog({ date, onDateChange }: { date: string; onDateChange: 
   )
 }
 
-function DraftCard({ draft, customers, today, onPublish, onDelete, isReviewing, onReview }: {
-  draft: any; customers: any[]; today: string
+function DraftCard({ draft, customers, units, today, onPublish, onDelete, isReviewing, onReview }: {
+  draft: any; customers: any[]; units: any[]; today: string
   onPublish: (draft: any, form: any) => Promise<void>
   onDelete: () => void
   isReviewing: boolean; onReview: () => void
@@ -222,6 +222,7 @@ function DraftCard({ draft, customers, today, onPublish, onDelete, isReviewing, 
     customerId:         draft.customerId ?? '',
     deliveryLocationId: draft.deliveryLocationId ?? '',
     orderedQty:         draft.orderedQty != null ? String(draft.orderedQty) : '',
+    uomId:              draft.uomId ?? '',
     deliveryDate:       draft.deliveryDate ?? today,
     pricePerUnit:       '',
     notes:              draft.notes ?? '',
@@ -312,8 +313,24 @@ function DraftCard({ draft, customers, today, onPublish, onDelete, isReviewing, 
           })()}
           <div className="grid grid-cols-2 gap-2">
             <div className="space-y-1">
-              <Label className="text-xs">Jumlah (sak) <span className="text-destructive">*</span></Label>
-              <Input className="h-8 text-xs" type="number" min={1} value={form.orderedQty} onChange={e => setForm(f => ({ ...f, orderedQty: e.target.value }))} required />
+              <Label className="text-xs">Jumlah <span className="text-destructive">*</span></Label>
+              <div className="flex gap-1">
+                <Input className="h-8 text-xs" type="number" min={0.001} step="any" value={form.orderedQty} onChange={e => setForm(f => ({ ...f, orderedQty: e.target.value }))} required />
+                <Select value={form.uomId || 'base'} onValueChange={v => setForm(f => ({ ...f, uomId: v === 'base' ? '' : v }))}>
+                  <SelectTrigger className="h-8 text-xs w-20 shrink-0"><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {units.filter((u: any) => u.isActive).map((u: any) => (
+                      <SelectItem key={u.id} value={u.isBase ? 'base' : u.id}>{u.abbreviation}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              {(() => {
+                const uom = units.find((u: any) => u.id === form.uomId)
+                if (!uom || uom.isBase || !form.orderedQty) return null
+                const inSak = (parseFloat(form.orderedQty) / uom.unitsPerSak).toFixed(2)
+                return <p className="text-xs text-muted-foreground">= {inSak} sak</p>
+              })()}
             </div>
             <div className="space-y-1">
               <Label className="text-xs">Tanggal Kirim <span className="text-destructive">*</span></Label>
@@ -486,7 +503,7 @@ const { canWrite, isAdmin } = useRole()
   }
 
   // ── Draft WA ──────────────────────────────────────────────────────────────
-  async function publishDraft(draft: any, form: { customerId: string; deliveryLocationId: string; orderedQty: string; deliveryDate: string; pricePerUnit: string; notes: string }) {
+  async function publishDraft(draft: any, form: { customerId: string; deliveryLocationId: string; orderedQty: string; uomId: string; deliveryDate: string; pricePerUnit: string; notes: string }) {
     const orderRes = await fetch('/api/orders', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -496,6 +513,7 @@ const { canWrite, isAdmin } = useRole()
         orderChannel:       'HOTLINE',
         deliveryDate:       form.deliveryDate,
         orderedQty:         Number(form.orderedQty),
+        uomId:              form.uomId || undefined,
         pricePerUnit:       Number(form.pricePerUnit),
         notes:              form.notes || undefined,
       }),
@@ -826,6 +844,7 @@ const { canWrite, isAdmin } = useRole()
                   key={draft.id}
                   draft={draft}
                   customers={customers ?? []}
+                  units={units}
                   today={today}
                   onPublish={publishDraft}
                   onDelete={() => deleteDraft(draft.id)}
