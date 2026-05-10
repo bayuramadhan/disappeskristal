@@ -30,13 +30,16 @@ export async function GET(req: NextRequest) {
           const newDrafts = await prisma.waDraft.findMany({
             where:   { createdAt: { gt: since } },
             orderBy: { createdAt: 'asc' },
-            select:  { id: true, sender: true, customerNameHint: true, orderedQty: true, deliveryDate: true, createdAt: true },
+            select:  { id: true, sender: true, customerNameHint: true, orderedQty: true, deliveryDate: true, createdAt: true,
+                       uom: { select: { abbreviation: true } } },
           })
 
           const newOrders = await prisma.order.findMany({
             where:   { createdAt: { gt: since }, orderChannel: 'HOTLINE' },
             orderBy: { createdAt: 'asc' },
-            select:  { id: true, orderNumber: true, orderedQty: true, deliveryDate: true, createdAt: true, customer: { select: { name: true } } },
+            select:  { id: true, orderNumber: true, orderedQty: true, deliveryDate: true, createdAt: true,
+                       customer: { select: { name: true } },
+                       uom:      { select: { abbreviation: true } } },
           })
 
           for (const draft of newDrafts) send('wa_draft', draft)

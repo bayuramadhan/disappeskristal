@@ -94,6 +94,7 @@ export async function GET(req: NextRequest) {
                 customer:         { select: { id: true, name: true, customerType: true } },
                 deliveryLocation: { select: { id: true, namaLokasi: true, alamat: true } },
                 rayon:            { select: { id: true, name: true } },
+                uom:              { select: { abbreviation: true, unitsPerSak: true } },
                 // Total alokasi pesanan ini ke SEMUA vehicle (untuk tampilkan split info)
                 vehicleAssignments: {
                   where:  { deletedAt: null },

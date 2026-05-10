@@ -46,6 +46,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
           pricePerUnit: true, status: true, notes: true, createdAt: true,
           deliveryLocation: { select: { id: true, namaLokasi: true, alamat: true } },
           vehicle:          { select: { id: true, plateNumber: true } },
+          uom:              { select: { abbreviation: true, unitsPerSak: true } },
         },
       }),
       prisma.order.aggregate({

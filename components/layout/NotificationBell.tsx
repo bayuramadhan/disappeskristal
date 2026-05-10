@@ -88,7 +88,7 @@ export function NotificationBell() {
         id:    `draft-${d.id}`,
         type:  'wa_draft',
         title: 'Pesan WA baru — perlu review',
-        body:  `${who}${d.orderedQty ? ` · ${d.orderedQty} sak` : ''}`,
+        body:  `${who}${d.orderedQty ? ` · ${d.orderedQty} ${d.uom?.abbreviation ?? 'sak'}` : ''}`,
         ts:    d.createdAt,
         href:  '/orders',
         read:  false,
@@ -103,7 +103,7 @@ export function NotificationBell() {
         id:    `order-${d.id}`,
         type:  'wa_order',
         title: 'Pesanan WA otomatis dibuat',
-        body:  `${d.customer?.name ?? '—'} · ${d.orderedQty} sak · ${format(new Date(d.deliveryDate), 'd MMM', { locale: localeId })}`,
+        body:  `${d.customer?.name ?? '—'} · ${d.orderedQty} ${d.uom?.abbreviation ?? 'sak'} · ${format(new Date(d.deliveryDate), 'd MMM', { locale: localeId })}`,
         ts:    d.createdAt,
         // Sertakan date + orderId agar orders page bisa langsung buka detail
         href:  `/orders?date=${date}&orderId=${d.id}`,

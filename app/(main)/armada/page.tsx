@@ -145,7 +145,7 @@ function OrderQueuePanel({ date, onRefreshFleet }: { date: string; onRefreshFlee
                             <span className="text-xs text-muted-foreground">{o.rayon?.name ?? o.deliveryLocation?.namaLokasi ?? '—'}</span>
                           </td>
                           <td className="px-4 py-2.5 text-right font-semibold tabular-nums">
-                            {o.orderedQty} sak
+                            {o.orderedQty} {o.uom?.abbreviation ?? 'sak'}
                           </td>
                           <td className="px-4 py-2.5 text-right hidden sm:table-cell tabular-nums">
                             {isUnassigned ? (

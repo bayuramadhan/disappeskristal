@@ -145,7 +145,7 @@ function OrderActivityLog({ date, onDateChange }: { date: string; onDateChange: 
                   {/* Detail spesifik per action */}
                   {log.action === 'ORDER_CREATED' && (
                     <p className="text-sm text-muted-foreground">
-                      {meta.orderedQty} sak · {meta.orderChannel}
+                      {meta.orderedQty} {meta.uom ?? 'sak'} · {meta.orderChannel}
                       {meta.pricePerUnit && ` · ${formatCurrency(meta.pricePerUnit)}/sak`}
                     </p>
                   )}
@@ -163,7 +163,7 @@ function OrderActivityLog({ date, onDateChange }: { date: string; onDateChange: 
                   )}
                   {log.action === 'ORDER_DELETED' && (
                     <p className="text-sm text-muted-foreground">
-                      {meta.orderedQty} sak · status sebelumnya: <StatusBadge status={meta.fromStatus} />
+                      {meta.orderedQty} {meta.uom ?? 'sak'} · status sebelumnya: <StatusBadge status={meta.fromStatus} />
                     </p>
                   )}
                   {log.action === 'ORDER_ASSIGNED' && (

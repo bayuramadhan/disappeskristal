@@ -406,7 +406,7 @@ export default function CustomerDetailPage() {
                     <TableCell className="text-sm">
                       {o.deliveryDate ? format(new Date(o.deliveryDate), 'dd/MM/yyyy') : '-'}
                     </TableCell>
-                    <TableCell className="text-right text-sm">{o.orderedQty} sak</TableCell>
+                    <TableCell className="text-right text-sm">{o.orderedQty} {o.uom?.abbreviation ?? 'sak'}</TableCell>
                     <TableCell className="text-right text-sm">
                       {formatCurrency((o.deliveredQty ?? 0) * o.pricePerUnit)}
                     </TableCell>
